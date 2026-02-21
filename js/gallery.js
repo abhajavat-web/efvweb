@@ -8,14 +8,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const lightboxImg = document.getElementById('lightbox-content');
     const closeBtn = document.querySelector('.close-lightbox');
 
-    // Add blurred background to each item
+    // Add blurred background to each item that doesn't already have one
     galleryItems.forEach(item => {
-        const img = item.querySelector('img');
-        if (img) {
-            const bgDiv = document.createElement('div');
-            bgDiv.className = 'gallery-item-bg';
-            bgDiv.style.backgroundImage = `url('${img.src}')`;
-            item.prepend(bgDiv);
+        if (!item.querySelector('.gallery-item-bg')) {
+            const img = item.querySelector('img');
+            if (img) {
+                const bgDiv = document.createElement('div');
+                bgDiv.className = 'gallery-item-bg';
+                bgDiv.style.backgroundImage = `url('${img.src}')`;
+                item.prepend(bgDiv);
+            }
         }
     });
 

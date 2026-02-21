@@ -249,6 +249,18 @@
         max-width: 350px;
     }
 
+    .nav-actions .btn {
+        width: auto !important;
+        padding: 8px 16px !important;
+        font-size: 0.75rem !important;
+        margin-right: 5px !important;
+    }
+
+    header.section {
+        padding-top: 120px !important;
+        padding-bottom: 30px !important;
+    }
+
     .logo img {
         height: 45px !important;
     }
@@ -262,6 +274,96 @@
 
     .hamburger {
         display: block !important;
+    }
+
+    /* SHORTEN TALL CARDS on mobile */
+    .carousel-track>.glass-panel {
+        height: auto !important;
+        min-height: 420px !important;
+        padding: 25px !important;
+    }
+
+    .carousel-track>.glass-panel h3 {
+        font-size: 1.2rem !important;
+        margin-bottom: 10px !important;
+        min-height: unset !important;
+    }
+
+    .carousel-track>.glass-panel p {
+        font-size: 0.9rem !important;
+        -webkit-line-clamp: 4 !important;
+        line-clamp: 4 !important;
+        display: -webkit-box !important;
+        -webkit-box-orient: vertical !important;
+        overflow: hidden !important;
+    }
+
+    /* Product Cards Shortening */
+    .product-card.glass-panel {
+        height: auto !important;
+        min-height: 480px !important;
+        padding: 20px !important;
+    }
+
+    .product-info h3 {
+        min-height: unset !important;
+        font-size: 1.1rem !important;
+    }
+
+    .product-card p {
+        min-height: unset !important;
+        margin-bottom: 15px !important;
+        font-size: 0.85rem !important;
+    }
+
+    /* Animation scaling for mobile */
+    .vortex-container,
+    .lotus-container,
+    .hex-grid-anim,
+    .signal-container,
+    .sacred-circle {
+        transform: scale(0.6) !important;
+    }
+
+    /* Blog Cards Shortening */
+    .blog-card,
+    .glass-panel.blog-card {
+        height: auto !important;
+        min-height: 420px !important;
+    }
+
+    .blog-content {
+        padding: 25px 20px !important;
+    }
+
+    .blog-excerpt {
+        -webkit-line-clamp: 3 !important;
+        line-clamp: 3 !important;
+        font-size: 0.85rem !important;
+    }
+
+    .blog-title {
+        font-size: 1.25rem !important;
+        margin-bottom: 10px !important;
+    }
+
+    /* Sacred Geometry scale down */
+    .sacred-geometry {
+        transform: scale(0.7);
+    }
+
+    /* Gallery responsiveness */
+    .gallery-container {
+        columns: auto 240px !important;
+    }
+
+    .gallery-item img {
+        max-height: 250px !important;
+    }
+
+    /* Video section responsive */
+    .preview-video-container {
+        height: 350px !important;
     }
 }
 
@@ -297,6 +399,27 @@
     .book-card,
     .testimonial-card {
         max-width: 100%;
+        padding: 15px !important;
+    }
+
+    .book-cover {
+        max-width: 180px !important;
+        margin-bottom: 10px !important;
+    }
+
+    .product-info h3 {
+        font-size: 0.95rem !important;
+        line-height: 1.2 !important;
+    }
+
+    .price {
+        font-size: 1.2rem !important;
+        margin-bottom: 10px !important;
+    }
+
+    /* Shorten carousel cards even more on tiny screens */
+    .carousel-track>.glass-panel {
+        min-height: 420px !important;
     }
 
     /* Footer Responsive XS */
