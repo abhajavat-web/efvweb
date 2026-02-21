@@ -992,46 +992,42 @@ document.addEventListener('DOMContentLoaded', () => {
     const cartItemsSection = document.getElementById('cart-items-container');
     const userProfileView = document.getElementById('user-profile-view');
 
+    // Unified Auth Modal Controller
     function openAuthModal(mode = 'login') {
-        if (!authModal) return;
+        const modal = document.getElementById('auth-modal');
+        if (!modal) {
+            console.warn("Auth modal not found in DOM.");
+            return;
+        }
 
-        // Hide cart when opening auth modal
-        toggleCart(false);
+        // Hide cart panel if open
+        if (typeof toggleCart === 'function') toggleCart(false);
 
-        authModal.classList.add('active');
+        modal.classList.add('active');
         document.body.classList.add('modal-open');
-        if (mode === 'login') {
-            switchTab('login');
-        } else {
-            switchTab('signup');
-        }
+        switchTab(mode);
     }
-
-    function closeAuth() {
-        if (authModal) {
-            authModal.classList.remove('active');
-            if (!cartPanel.classList.contains('active')) {
-                document.body.classList.remove('modal-open');
-            }
-        }
-    }
+    window.openAuthModal = openAuthModal;
 
     function switchTab(mode) {
-        // Update tab items — uses data-auth-tab attribute (new HTML structure)
+        // Update tab styling
         document.querySelectorAll('.auth-tab-item').forEach(t => {
             t.classList.toggle('active', t.dataset.authTab === mode);
         });
-        // Update forms — show matching form, hide others
+
+        // Update form visibility
         document.querySelectorAll('.auth-premium-form').forEach(f => {
             f.classList.remove('active');
             f.style.display = 'none';
         });
+
         const activeForm = document.getElementById(`${mode}-form`);
         if (activeForm) {
             activeForm.classList.add('active');
             activeForm.style.display = 'flex';
         }
     }
+    window.switchTab = switchTab;
 
 
 
@@ -1909,6 +1905,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     if (loginBtn) loginBtn.addEventListener('click', () => openAuthModal('login'));
+    if (signupBtn) signupBtn.addEventListener('click', () => openAuthModal('signup'));
     // --- Premium Auth Helpers ---
     window.showToast = function (message) {
         const toast = document.getElementById('auth-toast');
@@ -1918,36 +1915,16 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => toast.classList.remove('active'), 3000);
     };
 
-    window.openAuthModal = function (tab = 'login') {
-        const modal = document.getElementById('auth-modal');
-        if (!modal) return;
-        modal.classList.add('active');
-        switchTab(tab);
-    };
-
     window.closeAuth = function () {
         const modal = document.getElementById('auth-modal');
-        if (modal) modal.classList.remove('active');
-    };
-
-    function switchTab(tab) {
-        // Update tabs
-        document.querySelectorAll('.auth-tab-item').forEach(t => {
-            t.classList.toggle('active', t.dataset.authTab === tab);
-        });
-
-        // Update forms
-        document.querySelectorAll('.auth-premium-form').forEach(f => {
-            f.classList.remove('active');
-            f.style.display = 'none';
-        });
-
-        const activeForm = document.getElementById(`${tab}-form`);
-        if (activeForm) {
-            activeForm.classList.add('active');
-            activeForm.style.display = 'flex';
+        if (modal) {
+            modal.classList.remove('active');
+            const cartPanel = document.getElementById('cart-panel');
+            if (!cartPanel || !cartPanel.classList.contains('active')) {
+                document.body.classList.remove('modal-open');
+            }
         }
-    }
+    };
 
     // Modal Events
     if (closeAuthModal) closeAuthModal.onclick = closeAuth;
@@ -2557,14 +2534,25 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             if (userMenu) userMenu.remove();
             if (!loginBtn) {
-                loginBtn = document.createElement('button');
+                loginBtn = document.createElement('a');
                 loginBtn.id = 'nav-login-btn';
-                loginBtn.className = 'btn btn-gold small';
-                loginBtn.style.marginLeft = '10px';
+                loginBtn.href = 'javascript:void(0)';
+                loginBtn.className = 'btn btn-gold nav-login-btn';
+                loginBtn.style.padding = '10px 22px';
+                loginBtn.style.fontSize = '0.8rem';
+                loginBtn.style.borderRadius = '50px';
+                loginBtn.style.textDecoration = 'none';
+                loginBtn.style.color = 'var(--cosmic-black)';
                 loginBtn.textContent = 'Login';
-                loginBtn.onclick = () => openAuthModal('login');
                 navActions.appendChild(loginBtn);
             }
+
+            // Ensure click handler is always attached
+            loginBtn.onclick = (e) => {
+                if (e) e.preventDefault();
+                if (typeof openAuthModal === 'function') openAuthModal('login');
+                else if (typeof window.openAuthModal === 'function') window.openAuthModal('login');
+            };
         }
     };
 
