@@ -68,7 +68,7 @@ const STATIC_PRODUCTS = [
         subtitle: 'Hardcover Edition',
         type: 'HARDCOVER',
         price: 499,
-        thumbnail: 'img/vol1-cover.png',
+        thumbnail: 'img/english_v1.jpeg',
         category: 'Physical',
         description: 'Learn the secrets of Energy and Alignment. Premium hardcover book.',
         language: 'English',
@@ -80,7 +80,7 @@ const STATIC_PRODUCTS = [
         subtitle: 'Paperback Edition',
         type: 'PAPERBACK',
         price: 298,
-        thumbnail: 'img/vol1-cover.png',
+        thumbnail: 'img/english_v1.jpeg',
         category: 'Physical',
         description: 'Learn the secrets of Energy and Alignment. Easy-to-carry paperback book.',
         language: 'English',
@@ -92,7 +92,7 @@ const STATIC_PRODUCTS = [
         subtitle: 'Audiobook Edition',
         type: 'AUDIOBOOK',
         price: 199,
-        thumbnail: 'img/vol1-cover.png',
+        thumbnail: 'img/english_v1.jpeg',
         category: 'Digital',
         description: 'Listen and learn on the go. High-quality audio version.',
         language: 'English',
@@ -104,7 +104,7 @@ const STATIC_PRODUCTS = [
         subtitle: 'E-Book Edition',
         type: 'EBOOK',
         price: 149,
-        thumbnail: 'img/vol1-cover.png',
+        thumbnail: 'img/english_v1.jpeg',
         category: 'Digital',
         description: 'Read anytime, anywhere on your digital devices.',
         language: 'English',
@@ -213,94 +213,6 @@ const STATIC_PRODUCTS = [
         description: 'The complete English digital version of Volume 2. Accessible on all your devices.',
         language: 'English',
         volume: '2'
-    },
-
-    // ══════════════════════════════════════════════════════════════
-    //  VOLUMES 3–9 (Physical Hardcover)
-    // ══════════════════════════════════════════════════════════════
-    {
-        _id: 'efv_canon_v3_hard',
-        title: 'EFV™ VOL 3: UNIVERSAL ACTIVATION',
-        subtitle: 'Hardcover Edition',
-        type: 'HARDCOVER',
-        price: 699,
-        thumbnail: 'img/vol 3.png',
-        category: 'Physical',
-        description: 'A guide to awakening the untapped potential within you.',
-        language: 'Hindi',
-        volume: '3'
-    },
-    {
-        _id: 'efv_canon_v4_hard',
-        title: 'EFV™ VOL 4: RESONANCE BRIDGE',
-        subtitle: 'Hardcover Edition',
-        type: 'HARDCOVER',
-        price: 699,
-        thumbnail: 'img/vol 4.png',
-        category: 'Physical',
-        description: 'Bridges the gap between human awareness and universal intelligence.',
-        language: 'Hindi',
-        volume: '4'
-    },
-    {
-        _id: 'efv_canon_v5_hard',
-        title: 'EFV™ VOL 5: HUMAN OS™',
-        subtitle: 'Hardcover Edition',
-        type: 'HARDCOVER',
-        price: 749,
-        thumbnail: 'img/vol 5.png',
-        category: 'Physical',
-        description: 'A fresh look at the human operating system.',
-        language: 'Hindi',
-        volume: '5'
-    },
-    {
-        _id: 'efv_canon_v6_hard',
-        title: 'EFV™ VOL 6: EMOTIONOS™',
-        subtitle: 'Hardcover Edition',
-        type: 'HARDCOVER',
-        price: 749,
-        thumbnail: 'img/vol 6.png',
-        category: 'Physical',
-        description: 'Explains emotional intelligence as a powerful stabilizing force.',
-        language: 'Hindi',
-        volume: '6'
-    },
-    {
-        _id: 'efv_canon_v7_hard',
-        title: 'EFV™ VOL 7: MEMORYOS™',
-        subtitle: 'Hardcover Edition',
-        type: 'HARDCOVER',
-        price: 799,
-        thumbnail: 'img/vol 7.jpeg',
-        category: 'Physical',
-        description: 'Explores memory as the thread that holds identity together.',
-        language: 'Hindi',
-        volume: '7'
-    },
-    {
-        _id: 'efv_canon_v8_hard',
-        title: 'EFV™ VOL 8: AGENTOS™',
-        subtitle: 'Hardcover Edition',
-        type: 'HARDCOVER',
-        price: 849,
-        thumbnail: 'img/vol 8.png',
-        category: 'Physical',
-        description: 'Unpacks the rise of autonomous intelligence and intelligent agents.',
-        language: 'Hindi',
-        volume: '8'
-    },
-    {
-        _id: 'efv_canon_v9_hard',
-        title: 'EFV™ VOL 9: GOVERNANCEOS™',
-        subtitle: 'Hardcover Edition',
-        type: 'HARDCOVER',
-        price: 899,
-        thumbnail: 'img/vol 9.png',
-        category: 'Physical',
-        description: 'Focuses on ethics, alignment, and responsibility in an AI-powered civilization.',
-        language: 'Hindi',
-        volume: '9'
     }
 ];
 
@@ -334,11 +246,13 @@ document.addEventListener('DOMContentLoaded', () => {
             backendProducts.forEach(b => {
                 const staticIndex = STATIC_PRODUCTS.findIndex(sp => sp._id === b._id);
                 if (staticIndex !== -1) {
-                    // Merge all backend fields into static entry
-                    STATIC_PRODUCTS[staticIndex] = { ...STATIC_PRODUCTS[staticIndex], ...b };
-                } else {
-                    // Append new products from backend
-                    STATIC_PRODUCTS.push(b);
+                    // Only update existing products, don't add new ones
+                    // Preserve language and thumbnail from static catalog (backend must not override these)
+                    const preserved = {
+                        language: STATIC_PRODUCTS[staticIndex].language,
+                        thumbnail: STATIC_PRODUCTS[staticIndex].thumbnail
+                    };
+                    STATIC_PRODUCTS[staticIndex] = { ...STATIC_PRODUCTS[staticIndex], ...b, ...preserved };
                 }
             });
 

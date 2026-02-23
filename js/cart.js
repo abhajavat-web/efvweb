@@ -257,8 +257,11 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.insertAdjacentHTML('beforeend', cartHTML);
     }
 
-    // Inject Product Detail Modal HTML if not present
-    if (!document.getElementById('product-detail-modal')) {
+    // Inject Product Detail Modal HTML if not present (Skip for About, Feedback, Contact pages)
+    const currentPage = document.body.getAttribute('data-page');
+    const skipPages = ['about', 'preview', 'contact', 'gallery'];
+
+    if (!document.getElementById('product-detail-modal') && !skipPages.includes(currentPage)) {
         const productModalHTML = `
         <div class="product-modal-overlay" id="product-detail-modal">
             <div class="product-modal-card">
@@ -2482,16 +2485,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="user-dropdown" id="user-dropdown">
                         ${isAdmin ? `
                         <div style="padding: 10px 15px; font-size: 0.75rem; color: var(--gold-energy); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.8;">Admin Panel</div>
-                        <a href="admin-dashboard.html?tab=dashboard" class="dropdown-item"><i class="fas fa-tachometer-alt"></i> Command Center</a>
-                        <a href="admin-dashboard.html?tab=admin-orders" class="dropdown-item"><i class="fas fa-shopping-basket"></i> Orders Mgmt</a>
-                        <a href="admin-dashboard.html?tab=admin-products" class="dropdown-item"><i class="fas fa-box-open"></i> Products</a>
-                        <a href="admin-dashboard.html?tab=admin-customers" class="dropdown-item"><i class="fas fa-users-cog"></i> Customers</a>
-                        <a href="admin-dashboard.html?tab=admin-settings" class="dropdown-item"><i class="fas fa-sliders-h"></i> System Control</a>
+                        <a href="admin-dashboard.html?tab=dashboard" class="dropdown-item"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
                         ` : `
                         <div style="padding: 10px 15px; font-size: 0.75rem; color: var(--gold-energy); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; opacity: 0.8;">Account</div>
                         <a href="profile.html?tab=dashboard" class="dropdown-item"><i class="fas fa-th-large"></i> Dashboard</a>
-                        <a href="profile.html?tab=orders" class="dropdown-item"><i class="fas fa-shopping-bag"></i> My Orders</a>
-                        <a href="profile.html?tab=library" class="dropdown-item"><i class="fas fa-book-open"></i> My Library</a>
+                        <!-- <a href="profile.html?tab=orders" class="dropdown-item"><i class="fas fa-shopping-bag"></i> My Orders</a>
+                        <a href="profile.html?tab=library" class="dropdown-item"><i class="fas fa-book-open"></i> My Library</a> -->
                         `}
                         <div class="dropdown-divider"></div>
                         <a href="#" class="dropdown-item" id="nav-logout-btn" style="color: #ff4d4d;"><i class="fas fa-sign-out-alt"></i> Logout</a>

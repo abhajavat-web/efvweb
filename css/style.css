@@ -2095,6 +2095,8 @@ body.modal-open {
     position: absolute;
     top: 20px;
     right: 20px;
+    left: auto;
+    width: fit-content;
     background: rgba(3, 5, 9, 0.8);
     backdrop-filter: blur(10px);
     padding: 6px 14px;
@@ -2460,6 +2462,8 @@ body.modal-open {
     position: absolute;
     top: 25px;
     left: 25px;
+    right: auto;
+    width: fit-content;
     background: rgba(0, 0, 0, 0.4);
     padding: 8px 20px;
     border-radius: 50px;
