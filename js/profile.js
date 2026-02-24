@@ -29,24 +29,30 @@ window.openAddProductModal = function () {
 window.updateAdminStats = async function () {
     try {
         const token = localStorage.getItem('authToken');
-        const [productsRes, ordersRes] = await Promise.all([
+        const [productsRes, ordersRes, usersRes] = await Promise.all([
             fetch(`${API_BASE}/api/products`),
             fetch(`${API_BASE}/api/orders`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            }),
+            fetch(`${API_BASE}/api/users`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
         ]);
 
         const products = await productsRes.json();
         const orders = ordersRes.ok ? await ordersRes.json() : [];
+        const users = usersRes.ok ? await usersRes.json() : [];
         const revenue = orders.reduce((sum, o) => sum + (['Failed', 'Returned', 'Cancelled'].includes(o.status) ? 0 : o.totalAmount), 0);
 
         const totalProdEl = document.getElementById('admin-stat-total-products');
         const totalOrderEl = document.getElementById('admin-stat-total-orders');
         const revenueEl = document.getElementById('admin-stat-revenue');
+        const usersEl = document.getElementById('admin-stat-users');
 
         if (totalProdEl) totalProdEl.textContent = products.length;
         if (totalOrderEl) totalOrderEl.textContent = orders.length;
         if (revenueEl) revenueEl.textContent = '₹' + revenue.toLocaleString();
+        if (usersEl) usersEl.textContent = users.length;
     } catch (e) { console.error(e); }
 };
 
@@ -87,10 +93,43 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    // 2. Initialize Dashboard
-    initializeDashboard(user);
+    // 2. Initialize Mobile Menu FIRST (Critical)
+    const dashHamb = document.getElementById('dashboard-hamburger');
+    const sideNav = document.querySelector('.sidebar-nav');
 
-    // 3. Tab Logic
+    if (dashHamb && sideNav) {
+        // Clear existing to avoid double binding if script re-runs
+        const newDashHamb = dashHamb.cloneNode(true);
+        dashHamb.parentNode.replaceChild(newDashHamb, dashHamb);
+
+        newDashHamb.addEventListener('click', (e) => {
+            e.stopPropagation();
+            newDashHamb.classList.toggle('active');
+            sideNav.classList.toggle('active');
+        });
+
+        // Close menu when clicking a nav item
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                newDashHamb.classList.remove('active');
+                sideNav.classList.remove('active');
+            });
+        });
+
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!sideNav.contains(e.target) && !newDashHamb.contains(e.target)) {
+                newDashHamb.classList.remove('active');
+                sideNav.classList.remove('active');
+            }
+        });
+    }
+
+    // 3. Initialize Dashboard & Filters
+    initializeDashboard(user);
+    initializeNotificationFilters();
+
+    // 4. Tab Logic
     const tabs = document.querySelectorAll('.nav-item[data-tab]');
     const sections = document.querySelectorAll('.content-section');
 
@@ -106,6 +145,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const section = document.getElementById(targetId);
             if (section) section.classList.add('active');
 
+            if (targetId === 'admin-payments') loadAdminPayments();
+            if (targetId === 'admin-shipments') loadAdminShipments();
+            if (targetId === 'admin-coupons') loadAdminCoupons();
+
             // Refresh specific data on tab switch
             if (targetId === 'dashboard') updateDashboardOverview();
             if (targetId === 'admin') updateAdminStats();
@@ -118,89 +161,20 @@ document.addEventListener('DOMContentLoaded', () => {
             if (targetId === 'settings') {
                 const isAdmin = user.role === 'admin' || user.email.toLowerCase() === 'admin@uwo24.com';
                 if (isAdmin) {
-                    // Force admin to the control center
-                    tab.classList.remove('active'); // Remove active from the hidden customer settings tab
+                    tab.classList.remove('active');
                     sections.forEach(s => s.classList.remove('active'));
-
                     const adminSettingsSection = document.getElementById('admin-settings');
                     if (adminSettingsSection) adminSettingsSection.classList.add('active');
-
                     initializeAdminSettings();
                 } else {
                     initializeSettingsTabs();
                 }
             }
 
-            // Security Rule: Prevent customers from accessing admin-settings directly
-            if (targetId === 'admin-settings') {
-                const isAdmin = user.role === 'admin' || user.email.toLowerCase() === 'admin@uwo24.com';
-                if (!isAdmin) {
-                    window.location.href = 'profile.html'; // Bounce back
-                } else {
-                    initializeAdminSettings();
-                }
-            }
+            if (targetId === 'support') loadUserSupportHistory();
         });
     });
 
-    // 3.1 Settings Internals (NEW)
-    const initializeSettingsTabs = () => {
-        const sTabs = document.querySelectorAll('.settings-tab-btn[data-settings-tab]'); // Targeted to customer tabs
-        const sPanes = document.querySelectorAll('#settings .settings-pane');
-        sTabs.forEach(t => {
-            t.addEventListener('click', () => {
-                sTabs.forEach(btn => btn.classList.remove('active'));
-                sPanes.forEach(pane => pane.style.display = 'none');
-
-                t.classList.add('active');
-                const target = t.getAttribute('data-settings-tab');
-                document.getElementById(target).style.display = 'block';
-
-                if (target === 'addresses-tab') renderSavedAddresses();
-                if (target === 'payments-tab') loadBillingHistory();
-            });
-        });
-    };
-
-    const initializeAdminSettings = () => {
-        const user = JSON.parse(localStorage.getItem('efv_user'));
-        if (!user) return;
-
-        // 1. Fill Data
-        if (document.getElementById('adm-name')) document.getElementById('adm-name').value = user.name;
-        if (document.getElementById('adm-email')) document.getElementById('adm-email').value = user.email;
-        if (document.getElementById('admin-full-name')) document.getElementById('admin-full-name').textContent = user.name;
-        if (document.getElementById('adm-last-login')) {
-            document.getElementById('adm-last-login').value = new Date().toLocaleString();
-        }
-
-        // 2. Sub-tab Switching
-        const aTabs = document.querySelectorAll('.settings-tab-btn[data-admin-tab]');
-        const aPanes = document.querySelectorAll('#admin-settings .settings-pane');
-
-        aTabs.forEach(t => {
-            // Remove existing listeners by cloning if necessary, but here we just ensure we don't double bind
-            const newT = t.cloneNode(true);
-            t.parentNode.replaceChild(newT, t);
-
-            newT.addEventListener('click', () => {
-                aTabs.forEach(btn => btn.classList.remove('active')); // Note: we need to re-query for active class removal
-                document.querySelectorAll('.settings-tab-btn[data-admin-tab]').forEach(btn => btn.classList.remove('active'));
-                aPanes.forEach(pane => pane.style.display = 'none');
-
-                newT.classList.add('active');
-                const targetId = newT.getAttribute('data-admin-tab');
-                const targetPane = document.getElementById(targetId);
-                if (targetPane) targetPane.style.display = 'block';
-            });
-        });
-
-        // Toggle switches logic
-        document.querySelectorAll('.toggle-switch').forEach(sw => {
-            sw.onclick = () => sw.classList.toggle('active');
-        });
-    };
-    window.initializeAdminSettings = initializeAdminSettings; // Make it global
 
     // 3.2 Order Filters (NEW)
     document.querySelectorAll('[data-order-filter]').forEach(btn => {
@@ -267,7 +241,125 @@ document.addEventListener('DOMContentLoaded', () => {
     if (tabParam) {
         switchTab(tabParam);
     }
+
+    // User Support Form Submission
+    const supportForm = document.getElementById('user-support-form');
+    if (supportForm) {
+        supportForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const user = JSON.parse(localStorage.getItem('efv_user'));
+            const data = {
+                userId: user ? user._id : null,
+                name: user ? user.name : 'Anonymous',
+                email: user ? user.email : 'No Email',
+                subject: document.getElementById('support-subject').value,
+                message: document.getElementById('support-message').value
+            };
+
+            const btn = document.getElementById('send-support-btn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/support/message`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (res.ok) {
+                    if (typeof showToast === 'function') showToast("Message sent successfully! Our team will contact you.", "success");
+                    else alert("Message sent successfully!");
+                    supportForm.reset();
+                } else {
+                    const err = await res.json();
+                    if (typeof showToast === 'function') showToast(err.message || "Failed to send message", "error");
+                    else alert(err.message || "Failed to send message");
+                }
+            } catch (err) {
+                console.error(err);
+                if (typeof showToast === 'function') showToast("Connection error", "error");
+                else alert("Connection error");
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                loadUserSupportHistory();
+            }
+        });
+    }
 });
+
+async function loadUserSupportHistory() {
+    const container = document.getElementById('user-support-history');
+    if (!container) return;
+
+    try {
+        const token = localStorage.getItem('authToken');
+        const res = await fetch(`${API_BASE}/api/support/my-messages`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const messages = await res.json();
+
+        if (!res.ok) throw new Error(messages.message || 'Failed to fetch');
+
+        if (messages.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 40px; opacity: 0.5;">
+                    <i class="fas fa-comment-slash" style="font-size: 2rem; margin-bottom: 10px;"></i>
+                    <p>No previous inquiries found.</p>
+                </div>`;
+            return;
+        }
+
+        // Sort by newest first
+        messages.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        container.innerHTML = messages.map(msg => `
+            <div class="glass-panel inquiry-item" style="padding: 20px; margin-bottom: 20px; position: relative; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); border-radius: 15px; transition: transform 0.3s ease;">
+                <!-- Glowing background accent -->
+                <div style="position: absolute; top: -50px; right: -50px; width: 100px; height: 100px; background: var(--gold-text); opacity: 0.05; filter: blur(40px); border-radius: 50%;"></div>
+                
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 10px;">
+                    <div>
+                        <h4 style="margin: 0; color: var(--gold-text); font-family: 'Cinzel', serif; font-size: 1.1rem; letter-spacing: 1px;">${msg.subject}</h4>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                            <i class="far fa-calendar-alt" style="font-size: 0.75rem; opacity: 0.5;"></i>
+                            <span style="font-size: 0.75rem; opacity: 0.5;">${new Date(msg.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                        </div>
+                    </div>
+                    <span class="status-badge ${msg.status.toLowerCase().replace(' ', '-')}">${msg.status}</span>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <p style="font-size: 0.95rem; line-height: 1.6; opacity: 0.9; margin: 0; color: #fff;">${msg.message}</p>
+                </div>
+                
+                ${msg.reply ? `
+                    <div class="admin-reply-box" style="margin-top: 20px; padding: 18px; background: rgba(212, 175, 55, 0.08); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 12px; position: relative;">
+                        <div style="position: absolute; top: 10px; left: -8px; width: 4px; height: calc(100% - 20px); background: var(--gold-text); border-radius: 10px;"></div>
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                            <div style="width: 30px; height: 30px; background: var(--gold-text); display: flex; align-items: center; justify-content: center; border-radius: 50%;">
+                                <i class="fas fa-user-shield" style="color: #000; font-size: 0.8rem;"></i>
+                            </div>
+                            <span style="font-weight: 700; font-size: 0.85rem; color: var(--gold-text); text-transform: uppercase; letter-spacing: 1px;">Official Response</span>
+                            <span style="font-size: 0.7rem; opacity: 0.5; margin-left: auto;">${msg.repliedAt ? new Date(msg.repliedAt).toLocaleDateString() : ''}</span>
+                        </div>
+                        <p style="font-size: 0.9rem; line-height: 1.6; color: #f0f0f0; margin: 0; font-style: normal;">${msg.reply}</p>
+                    </div>
+                ` : `
+                    <div style="margin-top: 15px; display: flex; align-items: center; gap: 10px; opacity: 0.4; font-size: 0.8rem;">
+                        <i class="fas fa-clock"></i>
+                        <span>Waiting for response from our executive team...</span>
+                    </div>
+                `}
+            </div>
+        `).join('');
+    } catch (e) {
+        console.error(e);
+        container.innerHTML = '<p style="color: var(--error);">Failed to load history.</p>';
+    }
+}
 
 // GLOBAL UI HELPERS
 window.switchTab = function (tabId, subTab = null) {
@@ -301,6 +393,7 @@ window.switchTab = function (tabId, subTab = null) {
 
         // Manual triggers if click() wasn't enough
         if (effectiveTabId === 'admin-settings') initializeAdminSettings();
+        if (effectiveTabId === 'support') loadUserSupportHistory();
     }
 
     if (effectiveTabId === 'admin-settings' && subTab) {
@@ -576,7 +669,7 @@ window.syncLibraryWithBackend = async function () {
 
 
 // --- TAB RENDERING: NOTIFICATIONS ---
-function renderNotificationsTab() {
+function renderNotificationsTab(filter = 'all') {
     const profile = window.currentUserProfile;
     const container = document.getElementById('notifications-list');
     const emptyState = document.getElementById('notifications-empty-state');
@@ -585,20 +678,41 @@ function renderNotificationsTab() {
     if (!profile || !profile.notifications || profile.notifications.length === 0) {
         container.innerHTML = '';
         emptyState.classList.remove('hidden');
-        badge.classList.add('hidden');
+        if (badge) badge.classList.add('hidden');
         return;
     }
-    emptyState.classList.add('hidden');
 
-    const unreadCount = profile.notifications.filter(n => !n.isRead).length;
-    if (unreadCount > 0) {
-        badge.textContent = unreadCount;
-        badge.classList.remove('hidden');
-    } else {
-        badge.classList.add('hidden');
+    let notifications = profile.notifications;
+
+    // Apply filter
+    if (filter !== 'all') {
+        notifications = notifications.filter(n => {
+            // Mapping UI filters to notification types
+            if (filter === 'orders') return n.type === 'Order' || n.type === 'Shipment';
+            if (filter === 'payments') return n.type === 'Payment' || n.type === 'Subscription';
+            if (filter === 'offers') return n.type === 'Promo' || n.type === 'Digital';
+            return true;
+        });
     }
 
-    container.innerHTML = profile.notifications.map(note => {
+    if (notifications.length === 0) {
+        container.innerHTML = '';
+        emptyState.classList.remove('hidden');
+    } else {
+        emptyState.classList.add('hidden');
+    }
+
+    const unreadCount = profile.notifications.filter(n => !n.isRead).length;
+    if (badge) {
+        if (unreadCount > 0) {
+            badge.textContent = unreadCount;
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+    }
+
+    container.innerHTML = notifications.map(note => {
         const icon = getNotificationIcon(note.type);
         return `
             <div class="notification-item ${note.isRead ? '' : 'unread'}" onclick="markNotificationRead('${note._id}')">
@@ -1854,17 +1968,101 @@ window.loadAdminCustomers = async function () {
 
 window.loadAdminPayments = async function () {
     const tbody = document.getElementById('admin-payments-table-body');
-    if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center; opacity:0.5;">No payment records found yet.</td></tr>';
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center;">Fetching payments...</td></tr>';
+
+    try {
+        const token = localStorage.getItem('authToken');
+        const res = await fetch(`${API_BASE}/api/payments`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const payments = await res.json();
+
+        if (payments.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center; opacity:0.5;">No payment records found yet.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = payments.map(p => `
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                <td style="padding: 12px; font-family: monospace;">${p.paymentId || 'N/A'}</td>
+                <td style="padding: 12px; font-family: monospace;">#${p.orderId || 'N/A'}</td>
+                <td style="padding: 12px;">₹${p.amount}</td>
+                <td style="padding: 12px;">${p.method || 'Razorpay'}</td>
+                <td style="padding: 12px;"><span class="badge ${p.status === 'Paid' ? 'green' : 'gold'}">${p.status}</span></td>
+                <td style="padding: 12px;">${new Date(p.date || p.createdAt).toLocaleDateString()}</td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        console.error(e);
+        tbody.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center; color: #ff4d4d;">Error loading payments.</td></tr>';
+    }
 };
 
 window.loadAdminShipments = async function () {
     const tbody = document.getElementById('admin-shipments-table-body');
-    if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center; opacity:0.5;">No active shipments. Ready for Shiprocket integration.</td></tr>';
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center;">Fetching shipments...</td></tr>';
+
+    try {
+        const token = localStorage.getItem('authToken');
+        const res = await fetch(`${API_BASE}/api/shipments`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const shipments = await res.json();
+
+        if (shipments.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center; opacity:0.5;">No active shipments. Ready for Shiprocket integration.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = shipments.map(s => `
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                <td style="padding: 12px; font-family: monospace;">#${s.orderId}</td>
+                <td style="padding: 12px;">${s.courierName || 'Auto-Select'}</td>
+                <td style="padding: 12px; font-family: monospace;">${s.awbNumber || 'Pending'}</td>
+                <td style="padding: 12px;"><span class="badge ${s.shippingStatus === 'Delivered' ? 'green' : 'gold'}">${s.shippingStatus}</span></td>
+                <td style="padding: 12px;"><button class="btn btn-outline small" onclick="alert('Print functionality coming soon')">Print</button></td>
+                <td style="padding: 12px;">${s.trackingLink ? `<a href="${s.trackingLink}" target="_blank" style="color:var(--gold-text);">Track</a>` : 'N/A'}</td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        console.error(e);
+        tbody.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center; color: #ff4d4d;">Error loading shipments.</td></tr>';
+    }
 };
 
 window.loadAdminCoupons = async function () {
     const tbody = document.getElementById('admin-coupons-table-body');
-    if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center; opacity:0.5;">No coupons created yet.</td></tr>';
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center;">Fetching coupons...</td></tr>';
+
+    try {
+        const token = localStorage.getItem('authToken');
+        const res = await fetch(`${API_BASE}/api/coupons`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const coupons = await res.json();
+
+        if (coupons.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center; opacity:0.5;">No coupons created yet.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = coupons.map(c => `
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                <td style="padding: 12px; font-weight: bold; color: var(--gold-text);">${c.code}</td>
+                <td style="padding: 12px;">${c.type}</td>
+                <td style="padding: 12px;">${c.type === 'Percentage' ? c.value + '%' : '₹' + c.value}</td>
+                <td style="padding: 12px;">${c.usedCount} / ${c.usageLimit}</td>
+                <td style="padding: 12px;">${c.expiryDate ? new Date(c.expiryDate).toLocaleDateString() : 'Never'}</td>
+                <td style="padding: 12px;"><span class="badge ${c.isActive ? 'green' : 'red'}">${c.isActive ? 'Active' : 'Expired'}</span></td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        console.error(e);
+        tbody.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center; color: #ff4d4d;">Error loading coupons.</td></tr>';
+    }
 };
 
 window.loadAdminReports = function () {
@@ -2491,3 +2689,74 @@ function getStatusClass(status) {
         default: return 'status-pending';
     }
 }
+
+// 3.1 Settings Internals (NEW)
+function initializeSettingsTabs() {
+    const sTabs = document.querySelectorAll('.settings-tab-btn[data-settings-tab]'); // Targeted to customer tabs
+    const sPanes = document.querySelectorAll('#settings .settings-pane');
+    sTabs.forEach(t => {
+        t.addEventListener('click', () => {
+            sTabs.forEach(btn => btn.classList.remove('active'));
+            sPanes.forEach(pane => pane.style.display = 'none');
+
+            t.classList.add('active');
+            const target = t.getAttribute('data-settings-tab');
+            document.getElementById(target).style.display = 'block';
+
+            if (target === 'addresses-tab') renderSavedAddresses();
+            if (target === 'payments-tab') loadBillingHistory();
+        });
+    });
+}
+
+function initializeNotificationFilters() {
+    const nTabs = document.querySelectorAll('.settings-tab-btn[data-notif-filter]');
+    nTabs.forEach(t => {
+        t.addEventListener('click', () => {
+            nTabs.forEach(btn => btn.classList.remove('active'));
+            t.classList.add('active');
+            const filter = t.getAttribute('data-notif-filter');
+            renderNotificationsTab(filter);
+        });
+    });
+}
+
+function initializeAdminSettings() {
+    const user = JSON.parse(localStorage.getItem('efv_user'));
+    if (!user) return;
+
+    // 1. Fill Data
+    if (document.getElementById('adm-name')) document.getElementById('adm-name').value = user.name;
+    if (document.getElementById('adm-email')) document.getElementById('adm-email').value = user.email;
+    if (document.getElementById('admin-full-name')) document.getElementById('admin-full-name').textContent = user.name;
+    if (document.getElementById('adm-last-login')) {
+        document.getElementById('adm-last-login').value = new Date().toLocaleString();
+    }
+
+    // 2. Sub-tab Switching
+    const aTabs = document.querySelectorAll('.settings-tab-btn[data-admin-tab]');
+    const aPanes = document.querySelectorAll('#admin-settings .settings-pane');
+
+    aTabs.forEach(t => {
+        // Remove existing listeners by cloning if necessary, but here we just ensure we don't double bind
+        const newT = t.cloneNode(true);
+        t.parentNode.replaceChild(newT, t);
+
+        newT.addEventListener('click', () => {
+            aTabs.forEach(btn => btn.classList.remove('active')); // Note: we need to re-query for active class removal
+            document.querySelectorAll('.settings-tab-btn[data-admin-tab]').forEach(btn => btn.classList.remove('active'));
+            aPanes.forEach(pane => pane.style.display = 'none');
+
+            newT.classList.add('active');
+            const targetId = newT.getAttribute('data-admin-tab');
+            const targetPane = document.getElementById(targetId);
+            if (targetPane) targetPane.style.display = 'block';
+        });
+    });
+
+    // Toggle switches logic
+    document.querySelectorAll('.toggle-switch').forEach(sw => {
+        sw.onclick = () => sw.classList.toggle('active');
+    });
+}
+window.initializeAdminSettings = initializeAdminSettings; // Make it global

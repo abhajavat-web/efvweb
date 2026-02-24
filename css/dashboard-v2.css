@@ -149,27 +149,44 @@
     gap: 20px;
     overflow-x: auto;
     padding-bottom: 15px;
-    scrollbar-width: thin;
-    scrollbar-color: var(--gold-text) transparent;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 }
 
 .scroll-container::-webkit-scrollbar {
-    height: 6px;
+    display: none;
+    height: 0;
 }
 
 .scroll-container::-webkit-scrollbar-thumb {
-    background: rgba(255, 215, 0, 0.3);
-    border-radius: 10px;
+    background: transparent;
+}
+
+@media (max-width: 768px) {
+    .scroll-container {
+        flex-wrap: wrap;
+        justify-content: center;
+        overflow-x: hidden;
+        padding-bottom: 5px;
+    }
 }
 
 .mini-product-card {
-    min-width: 180px;
+    min-width: 160px;
+    /* Reduced for mobile fit */
     background: var(--card-bg);
     border: var(--glass-border);
     border-radius: 12px;
     padding: 15px;
     text-align: center;
     transition: transform 0.3s;
+}
+
+@media (max-width: 480px) {
+    .mini-product-card {
+        min-width: 140px;
+        padding: 10px;
+    }
 }
 
 .mini-product-card:hover {
@@ -307,6 +324,12 @@
     background: linear-gradient(90deg, #1a1a1a 25%, #2a2a2a 50%, #1a1a1a 75%);
     background-size: 200% 100%;
     animation: skeleton-loading 1.5s infinite;
+}
+
+@media (max-width: 768px) {
+    .skeleton {
+        height: 180px !important;
+    }
 }
 
 @keyframes skeleton-loading {

@@ -137,20 +137,30 @@ class EFVSecurity {
             .security-locked header, 
             .security-locked section, 
             .security-locked nav, 
-            .security-locked footer {
-                filter: blur(40px) brightness(0.4) sepia(1) hue-rotate(-50deg) !important;
+            .security-locked footer,
+            .security-locked .reader-overlay,
+            .security-locked .product-modal-overlay,
+            .security-locked .tc-modal-overlay,
+            .security-locked .modal-overlay {
+                filter: blur(50px) brightness(0.3) sepia(1) hue-rotate(-50deg) !important;
                 pointer-events: none !important;
                 user-select: none !important;
+                opacity: 0.1 !important;
             }
             .watermark-item {
-                opacity: 0.25 !important; /* Made it more visible */
-                color: rgba(212, 175, 55, 0.4) !important;
+                opacity: 0.22 !important; 
+                color: rgba(212, 175, 55, 0.45) !important;
+                font-family: 'Inter', sans-serif !important;
+                font-weight: 800 !important;
+                letter-spacing: 1px !important;
+                pointer-events: none !important;
             }
             .security-locked #security-overlay {
                 display: flex !important;
-                background: radial-gradient(circle at center, rgba(80, 0, 0, 0.98), rgba(0, 0, 0, 0.98));
+                background: radial-gradient(circle at center, rgba(30, 0, 0, 0.99), rgba(0, 0, 0, 1));
                 border-top: 8px solid #ff4d4d;
                 opacity: 1;
+                z-index: 2000000 !important;
             }
             .security-locked-blank {
                 display: block !important;
@@ -170,7 +180,9 @@ class EFVSecurity {
             .security-blur section, 
             .security-blur nav, 
             .security-blur footer,
-            .security-blur .reader-overlay {
+            .security-blur .reader-overlay,
+            .security-blur .product-modal-overlay,
+            .security-blur .tc-modal-overlay {
                 filter: blur(100px) !important;
                 opacity: 0 !important;
                 display: none !important;
@@ -362,7 +374,7 @@ class EFVSecurity {
 
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'hidden') {
-                this.triggerViolation("Tab Hidden/Changed");
+                this.triggerViolation("Tab Hidden/Changed (App Switcher Detected)");
             }
         });
 
@@ -384,7 +396,8 @@ class EFVSecurity {
             const dw = Math.abs(window.innerWidth - lastSize.w);
             const dh = Math.abs(window.innerHeight - lastSize.h);
             if (dw > 5 || dh > 5) {
-                this.triggerViolation("Window Size Tampered");
+                this.triggerViolation("Window Size Tampered/Orientation Change");
+                this.updateWatermark(); // Re-align instantly
                 lastSize = { w: window.innerWidth, h: window.innerHeight };
             }
         });
@@ -429,9 +442,11 @@ class EFVSecurity {
         const partialIP = this.userIP.split('.').slice(0, 3).join('.') + '.*';
         const text = `${this.userName} | ${this.userEmail} | ${timestamp} | IP: ${partialIP}`;
 
-        // Fill the screen with diagonal watermarks - increased density
-        const rows = 15; // Increased
-        const cols = 8;  // Increased
+        // Responsive grid to ensure full coverage without excessive overlap
+        const isMobile = window.innerWidth < 768;
+        const rows = isMobile ? 12 : 15;
+        const cols = isMobile ? 4 : 8;
+
         const spacingH = 100 / cols;
         const spacingV = 100 / rows;
 
@@ -443,7 +458,8 @@ class EFVSecurity {
                 item.style.top = `${(i * spacingV) - 2}%`;
                 item.style.left = `${(j * spacingH) - 5}%`;
                 // Add jitter to prevent easy algorithmic removal
-                item.style.paddingLeft = `${Math.random() * 20}px`;
+                item.style.paddingLeft = `${Math.random() * (isMobile ? 10 : 30)}px`;
+                item.style.fontSize = isMobile ? '10px' : '12px';
                 container.appendChild(item);
             }
         }

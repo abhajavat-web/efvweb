@@ -36,11 +36,19 @@
     scroll-behavior: smooth;
 }
 
+html,
+body {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden !important;
+    position: relative;
+}
+
 body {
     background-color: var(--cosmic-black);
     color: var(--white-text);
     font-family: 'Inter', sans-serif;
-    overflow-x: hidden;
     line-height: 1.6;
     letter-spacing: -0.01em;
 }
@@ -76,10 +84,11 @@ h2 {
 }
 
 h3 {
-    font-size: 1.4rem;
-    margin-bottom: 0.8rem;
-    min-height: 3.5rem;
-    /* Allow space for 2 lines so heights match */
+    font-size: 1.05rem;
+    /* Reduced from 1.2rem */
+    margin-bottom: 0.4rem;
+    min-height: 2.2rem;
+    /* Reduced from 2.5rem */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -99,6 +108,7 @@ p {
     margin-left: auto;
     margin-right: auto;
     color: rgba(240, 244, 248, 0.7);
+    text-align: center;
 }
 
 .gold-text {
@@ -117,6 +127,8 @@ p {
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
     width: 6px;
+    height: 0;
+    /* Kill horizontal scrollbar visibility */
 }
 
 ::-webkit-scrollbar-track {
@@ -149,6 +161,10 @@ p {
 
 .section {
     padding: 80px 0;
+    overflow: hidden;
+    /* Added to prevent child absolute animations from causing overflow */
+    position: relative;
+    /* Ensure overflow: hidden works for absolute children */
 }
 
 /* Grid Utilities */
@@ -178,7 +194,8 @@ p {
     -webkit-backdrop-filter: blur(25px) saturate(180%);
     border: 2px solid rgba(255, 211, 105, 0.7);
     border-radius: 24px;
-    padding: 35px;
+    padding: 25px;
+    /* Reduced from 35px for a more compact design */
     box-shadow:
         0 4px 24px -1px rgba(0, 0, 0, 0.3),
         inset 0 0 20px 0 var(--glass-shine),
@@ -222,13 +239,18 @@ nav {
     top: 0;
     left: 0;
     width: 100%;
-    z-index: 1000;
-    padding: 20px 0;
+    z-index: 999999 !important;
+    /* Ultra-high priority to stop any overlap */
+    padding: 12px 0;
+    /* Reduced from 20px for a more compact height */
     transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
-    background: linear-gradient(180deg, rgba(3, 5, 9, 0.4) 0%, rgba(3, 5, 9, 0.2) 100%);
-    backdrop-filter: blur(15px);
-    -webkit-backdrop-filter: blur(15px);
-    border-bottom: 1px solid rgba(255, 211, 105, 0.1);
+    background: rgba(3, 5, 9, 0.85);
+    /* Solidified background for better occlusion */
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    border-bottom: 2px solid rgba(255, 211, 105, 0.2);
+    transform: translateZ(0);
+    will-change: transform, background;
 }
 
 .nav-actions {
@@ -327,7 +349,8 @@ nav .container {
 }
 
 .logo img {
-    height: 75px !important;
+    height: 55px !important;
+    /* Reduced from 75px */
     width: auto !important;
     margin: 0 !important;
     order: -1;
@@ -339,7 +362,8 @@ nav .container {
     font-size: 0.8rem;
     font-weight: 700;
     letter-spacing: 2px;
-    margin-top: -5px;
+    margin-top: -2px;
+    /* Adjusted from -5px */
     position: relative;
     /* Pull text up slightly */
     background: linear-gradient(135deg, var(--gold-energy), var(--gold-light), var(--gold-energy));
@@ -484,7 +508,8 @@ nav .container {
     align-items: center;
     justify-content: center;
     position: relative;
-    padding: 140px 0 100px;
+    padding: 140px 0 80px;
+    /* Reduced from 180px for tighter layout */
     overflow: hidden;
     text-align: center;
 }
@@ -492,10 +517,13 @@ nav .container {
 .hero h1 {
     font-family: 'Playfair Display', serif;
     font-weight: 900;
-    font-size: clamp(4rem, 14vw, 8.5rem);
+    font-size: clamp(3rem, 12vw, 7.5rem);
+    /* Moderated from 8.5rem for better balance */
     line-height: 1.05;
     letter-spacing: -0.02em;
-    margin-bottom: 20px;
+    margin-bottom: 25px;
+    margin-top: 5px;
+    /* Reduced from 20px */
     text-transform: none;
     color: var(--white-text);
 }
@@ -560,15 +588,20 @@ nav .container {
     flex: 0 0 calc(33.333% - 20px);
     display: flex;
     flex-direction: column;
-    height: 680px;
-    /* Fixed height for absolute symmetry */
+    height: 500px;
+    /* Reduced from 580px for a very compact look */
     justify-content: flex-start;
 }
 
 .carousel-track>.glass-panel p {
     flex-grow: 1;
-    /* Pushes button to bottom */
-    margin-bottom: 25px !important;
+    margin-bottom: 15px !important;
+    font-size: 0.85rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .carousel-nav {
@@ -693,8 +726,8 @@ nav .container {
     display: flex;
     flex-direction: column;
     height: 100%;
-    min-height: 620px;
-    /* Increased to match home page baseline */
+    min-height: 320px;
+    /* Ultra-compact for maximum efficiency */
 }
 
 .product-info {
@@ -2347,7 +2380,7 @@ body.modal-open {
 
 .horizontal-testimonial-track .testimonial-card {
     flex: 0 0 320px;
-    height: 275px;
+    height: 210px;
     margin-bottom: 0;
     display: flex;
     flex-direction: column;
@@ -2376,7 +2409,7 @@ body.modal-open {
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    height: 520px;
+    height: 420px;
     background: #000;
     border-radius: 24px;
     position: relative;
@@ -2489,7 +2522,7 @@ body.modal-open {
     bottom: 0;
     left: 0;
     width: 100%;
-    padding: 40px 30px;
+    padding: 25px 20px;
     z-index: 3;
     display: flex;
     flex-direction: column;
@@ -2504,9 +2537,9 @@ body.modal-open {
 
 .blog-title {
     font-family: 'Montserrat', sans-serif;
-    font-size: 1.7rem;
+    font-size: 1.3rem;
     font-weight: 800;
-    margin-bottom: 15px;
+    margin-bottom: 8px;
     line-height: 1.2;
     color: #ffffff;
     text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
@@ -2523,7 +2556,7 @@ body.modal-open {
     font-size: 0.95rem;
     color: #f1f1f1;
     line-height: 1.7;
-    margin-bottom: 30px;
+    margin-bottom: 20px;
     font-weight: 400;
     text-shadow: 0 1px 5px rgba(0, 0, 0, 0.4);
     display: -webkit-box;
@@ -2572,7 +2605,7 @@ body.modal-open {
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4) !important;
     display: flex !important;
     flex-direction: column !important;
-    height: 520px !important;
+    height: 420px !important;
     border-radius: 24px !important;
     position: relative !important;
 }

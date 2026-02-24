@@ -2078,7 +2078,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         // Redirect to dashboard instead of opening cart
                         setTimeout(() => {
-                            window.location.href = 'profile.html';
+                            window.location.href = 'admin-dashboard.html';
                         }, 1000);
                         return;
                     } else {

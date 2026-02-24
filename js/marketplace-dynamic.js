@@ -334,28 +334,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
         card.innerHTML = `
             <div class="book-cover"
-                style="width: 100%; max-width: 280px; aspect-ratio: 2/3; margin: 0 auto 20px; background: #0b132b; border-radius: 10px; overflow: hidden; border: 1px solid var(--gold-energy); position: relative;">
-                <span style="position: absolute; top: 10px; right: 10px; background: ${typeBadgeColor}; color: black; padding: 4px 12px; border-radius: 4px; font-size: 0.7rem; font-weight: 800; z-index: 5; text-transform: uppercase; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">${typeLabel}</span>
+                style="width: 100%; max-width: 140px; aspect-ratio: 2/3; margin: 0 auto 8px; background: #0b132b; border-radius: 8px; overflow: hidden; border: 1px solid var(--gold-energy); position: relative;">
+                <span style="position: absolute; top: 5px; right: 5px; background: ${typeBadgeColor}; color: black; padding: 2px 8px; border-radius: 3px; font-size: 0.6rem; font-weight: 800; z-index: 5; text-transform: uppercase;">${typeLabel}</span>
                 <img src="${imageUrl}" alt="${product.title}" loading="lazy"
                     style="width: 100%; height: 100%; object-fit: cover;"
                     onerror="this.src='img/vol1-cover.png'">
             </div>
             <div class="product-info" style="text-align: center;">
-                ${langBadge}
-                <h3 style="font-size: 1.05rem; letter-spacing: 1px; margin-bottom: 5px; line-height: 1.4;">
+                <h3 style="font-size: 0.9rem; letter-spacing: 0.5px; margin-bottom: 2px; line-height: 1.2; min-height: unset; color: var(--gold-energy);">
                     ${product.title}
                 </h3>
-                <span style="color: var(--gold-energy); font-size: 0.85rem; display: block; margin-bottom: 10px;">${typeLabel} Edition</span>
+                <span style="color: rgba(255,255,255,0.6); font-size: 0.75rem; display: block; margin-bottom: 4px;">${typeLabel} Edition</span>
             </div>
-            <div class="rating" style="color: var(--gold-energy); margin: 8px 0; text-align: center;">
+            <div class="rating" style="color: var(--gold-energy); margin: 2px 0; text-align: center; font-size: 0.7rem; opacity: 0.8;">
                 <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
             </div>
-            <p style="margin-bottom: 16px; font-size: 0.88rem; opacity: 0.8; min-height: 60px; text-align: center; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;">
+            <p style="margin-bottom: 8px; font-size: 0.78rem; opacity: 0.7; min-height: 34px; text-align: center; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3;">
                 ${product.description || 'Discover the secrets of Energy and Alignment.'}
             </p>
-            <span class="price" style="font-size: 1.5rem; display: block; text-align: center; margin-bottom: 16px;">₹${product.price}.00</span>
-            <div style="display: flex; gap: 10px; flex-direction: column;">
-                <button class="btn btn-gold add-to-cart" style="width: auto; padding: 12px 30px; margin: 0 auto;">${buttonText}</button>
+            <span class="price" style="font-size: 1.15rem; display: block; text-align: center; margin-bottom: 10px; font-weight: 800; color: #fff;">₹${product.price}</span>
+            <div style="display: flex; gap: 5px; flex-direction: column;">
+                <button class="btn btn-gold add-to-cart" style="width: auto; padding: 6px 20px; margin: 0 auto; font-size: 0.7rem; min-height: unset;">${buttonText}</button>
             </div>
         `;
 

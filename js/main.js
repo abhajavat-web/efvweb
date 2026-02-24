@@ -178,7 +178,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Global Modal System
     const initModal = () => {
-        const modalHtml = `
+        // Privacy Modal HTML
+        const privacyModalHtml = `
             <div class="modal-overlay" id="privacy-modal">
                 <div class="modal-card">
                     <button class="modal-close" aria-label="Close Modal">
@@ -226,7 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
 
                         <div style="padding-top: 20px; border-top: 1px solid var(--glass-border); text-align: center; opacity: 0.6; font-size: 0.85rem;">
-                            Contact: support@uwo.ai<br>
+                            Contact: admin@uwo24.com<br>
                             UWO Framework & EFV Ecosystem — Alignment Intelligence
                         </div>
                     </div>
@@ -234,38 +235,105 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
 
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        // Terms Modal HTML
+        const termsModalHtml = `
+            <div class="modal-overlay" id="terms-modal">
+                <div class="modal-card">
+                    <button class="modal-close" aria-label="Close Modal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <h2 style="text-align: center; margin-bottom: 25px; font-family: 'Montserrat', sans-serif; font-weight: 800; color: var(--gold-energy); border-bottom: 1px solid var(--glass-border); padding-bottom: 15px;">
+                        TERMS & CONDITIONS
+                    </h2>
+                    <div class="modal-body" style="font-family: 'Inter', sans-serif; color: rgba(240, 244, 248, 0.9);">
+                        <div style="text-align: center; margin-bottom: 30px;">
+                            <p style="font-weight: 700; color: var(--gold-light); font-size: 1.1rem;">By purchasing "EFV™" from our website, you agree to the following terms:</p>
+                            <p style="font-size: 0.9rem; opacity: 0.6;">Last Updated: 13/02/2026</p>
+                        </div>
 
-        const modal = document.getElementById('privacy-modal');
-        const closeBtn = modal.querySelector('.modal-close');
+                        <div style="margin-bottom: 25px;">
+                            <h3 style="font-family: 'Montserrat', sans-serif; font-size: 1rem; color: var(--gold-energy); margin-bottom: 12px; text-transform: uppercase;">1. Product Information</h3>
+                            <p style="font-size: 0.95rem;">We sell physical copies (Hardcover / Paperback) and digital formats (E-book / Audiobook) of EFV™.</p>
+                        </div>
 
-        const openModal = (e) => {
-            if (e) e.preventDefault();
-            document.body.classList.add('modal-open');
-            modal.style.display = 'flex';
-            setTimeout(() => modal.classList.add('active'), 10);
+                        <div style="margin-bottom: 25px;">
+                            <h3 style="font-family: 'Montserrat', sans-serif; font-size: 1rem; color: var(--gold-energy); margin-bottom: 12px; text-transform: uppercase;">2. Pricing & Payments</h3>
+                            <ul style="list-style: disc; margin-left: 20px; font-size: 0.95rem; opacity: 0.85;">
+                                <li>All prices are listed in INR.</li>
+                                <li>Payments are processed securely via Razorpay.</li>
+                                <li>We reserve the right to change prices.</li>
+                            </ul>
+                        </div>
+
+                        <div style="margin-bottom: 25px;">
+                            <h3 style="font-family: 'Montserrat', sans-serif; font-size: 1rem; color: var(--gold-energy); margin-bottom: 12px; text-transform: uppercase;">3. Order Confirmation</h3>
+                            <p style="font-size: 0.95rem;">You will receive an email confirmation after successful payment. Orders are processed within 2–3 working days.</p>
+                        </div>
+
+                        <div style="margin-bottom: 25px;">
+                            <h3 style="font-family: 'Montserrat', sans-serif; font-size: 1rem; color: var(--gold-energy); margin-bottom: 12px; text-transform: uppercase;">4. Shipping & Delivery</h3>
+                            <p style="font-size: 0.95rem;">Delivery timelines depend on location. Incorrect shipping details provided by the customer are the customer's responsibility.</p>
+                        </div>
+
+                        <div style="margin-bottom: 25px;">
+                            <h3 style="font-family: 'Montserrat', sans-serif; font-size: 1rem; color: var(--gold-energy); margin-bottom: 12px; text-transform: uppercase;">5. Refund & Cancellation</h3>
+                            <ul style="list-style: disc; margin-left: 20px; font-size: 0.95rem; opacity: 0.85;">
+                                <li>Physical books: Refunds only for damage with opening video within 48h.</li>
+                                <li>Digital products: Non-refundable once delivered.</li>
+                            </ul>
+                        </div>
+
+                        <div style="margin-bottom: 25px;">
+                            <h3 style="font-family: 'Montserrat', sans-serif; font-size: 1rem; color: var(--gold-energy); margin-bottom: 12px; text-transform: uppercase;">6. Intellectual Property</h3>
+                            <p style="font-size: 0.95rem;">All EFV™ content is protected by copyright. Unauthorized reproduction or sharing is strictly prohibited.</p>
+                        </div>
+
+                        <div style="padding-top: 20px; border-top: 1px solid var(--glass-border); text-align: center; opacity: 0.6; font-size: 0.85rem;">
+                            Email: admin@uwo24.com<br>
+                            Unified Web Options and Services Private Limited
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.insertAdjacentHTML('beforeend', privacyModalHtml);
+        document.body.insertAdjacentHTML('beforeend', termsModalHtml);
+
+        const setupModal = (modalId, triggerSelector) => {
+            const modal = document.getElementById(modalId);
+            if (!modal) return;
+            const closeBtn = modal.querySelector('.modal-close');
+
+            const openModal = (e) => {
+                if (e) e.preventDefault();
+                document.body.classList.add('modal-open');
+                modal.style.display = 'flex';
+                setTimeout(() => modal.classList.add('active'), 10);
+            };
+
+            const closeModal = () => {
+                modal.classList.remove('active');
+                document.body.classList.remove('modal-open');
+                setTimeout(() => modal.style.display = 'none', 400);
+            };
+
+            document.querySelectorAll(triggerSelector).forEach(link => {
+                link.addEventListener('click', openModal);
+            });
+
+            closeBtn.addEventListener('click', closeModal);
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) closeModal();
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && modal.classList.contains('active')) closeModal();
+            });
         };
 
-        const closeModal = () => {
-            modal.classList.remove('active');
-            document.body.classList.remove('modal-open');
-            setTimeout(() => modal.style.display = 'none', 400);
-        };
-
-        // Attach to all Privacy Policy links
-        document.querySelectorAll('a[href*="privacy-policy.html"]').forEach(link => {
-            link.addEventListener('click', openModal);
-        });
-
-        closeBtn.addEventListener('click', closeModal);
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) closeModal();
-        });
-
-        // Escape key to close
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && modal.classList.contains('active')) closeModal();
-        });
+        setupModal('privacy-modal', 'a[href*="privacy-policy.html"]');
+        setupModal('terms-modal', 'a[href*="terms.html"]');
     };
 
     initModal();

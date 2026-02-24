@@ -159,11 +159,48 @@
 
         @media (max-width: 768px) {
             .gallery-container {
-                columns: 1;
+                display: grid;
+                grid-template-columns: repeat(6, 1fr);
+                gap: 10px;
+                columns: auto;
+                padding: 10px 0;
+            }
+
+            .gallery-item {
+                margin-bottom: 0;
+                border-radius: 10px;
+                height: 100%;
+            }
+
+            /* Alternating Pattern: Row of 2, then Row of 3 */
+            /* Items 1,2, 6,7... span 3 cols (2 per row) */
+            .gallery-item:nth-child(5n+1),
+            .gallery-item:nth-child(5n+2) {
+                grid-column: span 3;
+            }
+
+            /* Items 3,4,5, 8,9,10... span 2 cols (3 per row) */
+            .gallery-item:nth-child(5n+3),
+            .gallery-item:nth-child(5n+4),
+            .gallery-item:nth-child(5n+5) {
+                grid-column: span 2;
+            }
+
+            .gallery-item img {
+                height: 100% !important;
+                min-height: 140px;
+                max-height: 180px !important;
+                object-fit: cover;
+            }
+
+            /* Specifically make the 2-per-row images slightly taller for better rhythm */
+            .gallery-item:nth-child(5n+1) img,
+            .gallery-item:nth-child(5n+2) img {
+                max-height: 220px !important;
             }
 
             .container {
-                padding: 0 20px;
+                padding: 0 12px;
             }
         }
     </style>
@@ -223,11 +260,11 @@
                     </div>
                 </div>
 
-                <div class="gallery-item reveal" data-type="image" data-src="img/gallery-new-2.jpg">
-                    <img src="img/gallery-new-2.jpg" alt="Holding EFV Canon" loading="lazy">
+                <div class="gallery-item reveal" data-type="image" data-src="img/gallery-new-1.jpg">
+                    <img src="img/gallery-new-1.jpg" alt="Life in Flow" loading="lazy">
                     <div class="gallery-overlay">
-                        <h4>ENERGY ALIGNMENT</h4>
-                        <span>Interaction</span>
+                        <h4>LIFE IN FLOW</h4>
+                        <span>Experience</span>
                     </div>
                 </div>
 
@@ -268,6 +305,14 @@
                     <div class="gallery-overlay">
                         <h4>COSMIC HARMONY</h4>
                         <span>Balance</span>
+                    </div>
+                </div>
+
+                <div class="gallery-item reveal" data-type="image" data-src="img/feedback/feedback-6.jpg">
+                    <img src="img/feedback/feedback-6.jpg" alt="Perspective View" loading="lazy">
+                    <div class="gallery-overlay">
+                        <h4>PERSPECTIVE</h4>
+                        <span>Vision</span>
                     </div>
                 </div>
 
