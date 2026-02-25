@@ -351,8 +351,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.insertAdjacentHTML('beforeend', productModalHTML);
     }
 
-    let cart = JSON.parse(localStorage.getItem('efv_cart')) || [];
-
     // User Data Isolation Helpers
     function getUserKey(baseKey) {
         const user = JSON.parse(localStorage.getItem('efv_user'));
@@ -361,6 +359,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return `${baseKey}_${cleanEmail}`;
     }
     window.getUserKey = getUserKey;
+
+    let cart = JSON.parse(localStorage.getItem(getUserKey('efv_cart'))) || [];
 
 
     const API_BASE = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) ? CONFIG.API_BASE_URL : 'http://localhost:5000';
@@ -501,8 +501,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (checkoutBtn) checkoutBtn.style.display = 'none';
             if (userProfileView) userProfileView.style.display = 'none';
         }
-
-        localStorage.setItem('efv_cart', JSON.stringify(cart));
+        localStorage.setItem(getUserKey('efv_cart'), JSON.stringify(cart));
 
         // Add Remove listeners
         document.querySelectorAll('.remove-item').forEach(btn => {
@@ -911,7 +910,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 cart.push({ id, name, price, quantity: quantityToAdd, type: 'PHYSICAL' });
             }
-            localStorage.setItem('efv_cart', JSON.stringify(cart));
+            localStorage.setItem(getUserKey('efv_cart'), JSON.stringify(cart));
             updateCartUI();
 
             // Show Standard Cart for physical (ensure profile is hidden)
@@ -2071,6 +2070,18 @@ document.addEventListener('DOMContentLoaded', () => {
                         }));
                         sessionStorage.setItem('adminLoggedIn', 'true');
 
+                        // Merge Admin Cart
+                        const userCartKey = getUserKey('efv_cart');
+                        let userCart = JSON.parse(localStorage.getItem(userCartKey)) || [];
+                        cart.forEach(anonItem => {
+                            const existing = userCart.find(i => i.id === anonItem.id);
+                            if (existing) existing.quantity += (anonItem.quantity || 1);
+                            else userCart.push(anonItem);
+                        });
+                        cart = userCart;
+                        localStorage.setItem(userCartKey, JSON.stringify(cart));
+                        localStorage.removeItem('efv_cart');
+
                         if (window.updateAdminNavbar) window.updateAdminNavbar();
                         closeAuth();
                         showToast('Welcome back, Admin!');
@@ -2107,6 +2118,25 @@ document.addEventListener('DOMContentLoaded', () => {
                     role: data.role,
                     _id: data._id
                 }));
+
+                // MERGE ANONYMOUS CART INTO USER CART
+                const userCartKey = getUserKey('efv_cart');
+                let userCart = JSON.parse(localStorage.getItem(userCartKey)) || [];
+
+                // Merge current (anonymous) cart into user's cart
+                cart.forEach(anonItem => {
+                    const existing = userCart.find(i => i.id === anonItem.id);
+                    if (existing) {
+                        existing.quantity += (anonItem.quantity || 1);
+                    } else {
+                        userCart.push(anonItem);
+                    }
+                });
+
+                // Update global cart variable and storage
+                cart = userCart;
+                localStorage.setItem(userCartKey, JSON.stringify(cart));
+                localStorage.removeItem('efv_cart'); // Clean up anonymous cart
 
                 closeAuth();
                 showToast('Welcome back!');
@@ -2194,9 +2224,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     role: 'user'
                 }));
 
+                // MERGE ANONYMOUS CART INTO NEW USER CART
+                const userCartKey = getUserKey('efv_cart');
+                let userCart = JSON.parse(localStorage.getItem(userCartKey)) || [];
+                cart.forEach(anonItem => {
+                    const existing = userCart.find(i => i.id === anonItem.id);
+                    if (existing) existing.quantity += (anonItem.quantity || 1);
+                    else userCart.push(anonItem);
+                });
+                cart = userCart;
+                localStorage.setItem(userCartKey, JSON.stringify(cart));
+                localStorage.removeItem('efv_cart');
+
                 closeAuth();
                 showToast('Account created successfully!');
                 if (typeof updateAuthNavbar === 'function') updateAuthNavbar();
+                updateCartUI();
 
                 // Auto-login flow: Redirect to profile for dashboard access
                 setTimeout(() => {

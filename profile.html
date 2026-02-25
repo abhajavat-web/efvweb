@@ -39,7 +39,8 @@
             <!-- User Profile Summary -->
             <div class="user-profile-sm">
                 <div class="avatar-container">
-                    <img src="img/default-avatar.png" alt="User Avatar" id="sidebar-avatar"
+                    <img src="https://ui-avatars.com/api/?name=User&background=D4AF37&color=fff" alt="User Avatar"
+                        id="sidebar-avatar"
                         onerror="this.src='https://ui-avatars.com/api/?name=User&background=D4AF37&color=fff'">
                     <div class="status-indicator online"></div>
                 </div>
@@ -286,9 +287,47 @@
                         </div>
                     </div>
                     <div id="security-tab" class="settings-pane" style="display: none;">
-                        <div class="settings-card glass-panel">
-                            <h3>Security</h3>
-                            <button class="btn btn-danger" onclick="logoutAction()">Sign Out</button>
+                        <div class="settings-card glass-panel" style="max-width: 500px;">
+                            <h3 style="margin-bottom: 25px; color: var(--gold-text);"><i class="fas fa-shield-alt"></i>
+                                Security Settings</h3>
+
+                            <form id="change-password-form" style="display: flex; flex-direction: column; gap: 18px;">
+                                <div class="form-group">
+                                    <label
+                                        style="display: block; margin-bottom: 8px; font-size: 0.9rem; opacity: 0.8;">Current
+                                        Password</label>
+                                    <input type="password" id="current-password" class="glass-input" required
+                                        placeholder="••••••••">
+                                </div>
+                                <div class="form-group">
+                                    <label
+                                        style="display: block; margin-bottom: 8px; font-size: 0.9rem; opacity: 0.8;">New
+                                        Password</label>
+                                    <input type="password" id="new-password" class="glass-input" required
+                                        placeholder="Minimum 6 characters">
+                                </div>
+                                <div class="form-group">
+                                    <label
+                                        style="display: block; margin-bottom: 8px; font-size: 0.9rem; opacity: 0.8;">Confirm
+                                        New Password</label>
+                                    <input type="password" id="confirm-password" class="glass-input" required
+                                        placeholder="••••••••">
+                                </div>
+
+                                <div style="margin-top: 10px; display: flex; gap: 15px; align-items: center;">
+                                    <button type="submit" class="btn btn-gold" id="change-pass-btn">Update
+                                        Password</button>
+                                </div>
+                            </form>
+
+                            <div
+                                style="margin-top: 40px; padding-top: 25px; border-top: 1px solid rgba(255,255,255,0.05);">
+                                <h4 style="margin-bottom: 15px; color: #ff4d4d; font-size: 0.9rem;">Account Session</h4>
+                                <button class="btn btn-outline" onclick="logoutAction()"
+                                    style="border-color: rgba(255, 77, 77, 0.3); color: #ff4d4d;">
+                                    <i class="fas fa-sign-out-alt"></i> Sign Out from this Device
+                                </button>
+                            </div>
                         </div>
                     </div>
                     <div id="addresses-tab" class="settings-pane" style="display: none;">
@@ -339,30 +378,212 @@
     </div>
 
     <!-- Modals -->
-    <div id="order-detail-modal" class="resume-modal-overlay" style="display: none;">
-        <div class="resume-modal glass-panel" style="max-width: 800px; width: 95%;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2 style="margin: 0; color: var(--gold-text);">Order <span id="modal-order-id">#ORD-000</span></h2>
-                <button onclick="closeOrderDetailModal()"
-                    style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
+    <!-- Order Detail Modal (Upgraded) -->
+    <div id="order-detail-modal" class="reader-overlay" style="display: none; z-index: 10000;">
+        <div class="reader-toolbar glass-panel">
+            <div class="reader-title"><i class="fas fa-box-open gold-text"></i> ORDER DETAILS <span id="modal-order-id"
+                    style="color: white; margin-left: 10px;">#ORD-000</span></div>
+            <button class="btn-icon" onclick="closeOrderDetailModal()"><i class="fas fa-times"></i></button>
+        </div>
+
+        <div class="reader-canvas-container"
+            style="justify-content: center; align-items: flex-start; padding: 40px 20px; overflow-y: auto;">
+            <div style="width: 95%; max-width: 900px; display: grid; grid-template-columns: 1fr 320px; gap: 30px;">
+
+                <!-- Left: Items & Tracking -->
+                <div>
+                    <!-- Timeline Section -->
+                    <div class="glass-panel" style="padding: 30px; margin-bottom: 25px; border-radius: 20px;">
+                        <h3 style="margin-bottom: 30px; display: flex; align-items: center; gap: 10px;">
+                            <i class="fas fa-truck-loading gold-text"></i> Tracking Status
+                        </h3>
+                        <div id="modal-order-timeline" class="tracking-timeline-v2">
+                            <!-- Timeline Steps Injected Here -->
+                        </div>
+                    </div>
+
+                    <!-- Items Section -->
+                    <div class="glass-panel" style="padding: 30px; border-radius: 20px;">
+                        <h3 style="margin-bottom: 25px;">Order Items</h3>
+                        <div id="modal-order-items" style="display: flex; flex-direction: column; gap: 15px;">
+                            <!-- Items Injected Here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Summary & Address -->
+                <div style="display: flex; flex-direction: column; gap: 25px;">
+                    <!-- Price Summary -->
+                    <div class="glass-panel" style="padding: 25px; border-radius: 20px;">
+                        <h4
+                            style="margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 15px;">
+                            Payment Summary</h4>
+                        <div style="display: flex; flex-direction: column; gap: 12px; font-size: 0.95rem;">
+                            <div style="display: flex; justify-content: space-between; opacity: 0.7;">
+                                <span>Subtotal</span>
+                                <span id="modal-subtotal">₹0.00</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; opacity: 0.7;">
+                                <span>Shipping</span>
+                                <span style="color: #4CAF50;">FREE</span>
+                            </div>
+                            <div
+                                style="display: flex; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); font-weight: 800; font-size: 1.1rem; color: var(--gold-text);">
+                                <span>Total Paid</span>
+                                <span id="modal-total">₹0.00</span>
+                            </div>
+                        </div>
+                        <div
+                            style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 0.85rem; opacity: 0.6;">
+                            <p style="margin: 0;">Method: <span id="modal-payment-method"
+                                    style="color: white; font-weight: 600;">Razorpay</span></p>
+                            <p style="margin: 5px 0 0;">Status: <span id="modal-payment-status"
+                                    style="color: #4CAF50; font-weight: 600;">Paid</span></p>
+                        </div>
+                    </div>
+
+                    <!-- Delivery Address -->
+                    <div class="glass-panel" style="padding: 25px; border-radius: 20px;">
+                        <h4 style="margin-bottom: 15px;">Shipping Address</h4>
+                        <p id="modal-shipping-address"
+                            style="font-size: 0.9rem; opacity: 0.8; line-height: 1.6; margin: 0;"></p>
+                    </div>
+
+                    <div id="modal-order-date" style="text-align: center; font-size: 0.8rem; opacity: 0.4;">
+                        Placed on: Feb 25, 2026
+                    </div>
+                </div>
             </div>
-            <div id="modal-order-items"></div>
         </div>
     </div>
 
     <div id="address-modal" class="resume-modal-overlay" style="display: none;">
         <div class="resume-modal glass-panel" style="max-width: 550px; width: 95%;">
             <h2 id="address-modal-title" style="margin-bottom: 20px; color: var(--gold-text);">Add Address</h2>
-            <form id="address-form" style="display: flex; flex-direction: column; gap: 15px;">
-                <input type="text" id="addr-name" placeholder="Name" required class="glass-input">
-                <input type="tel" id="addr-phone" placeholder="Phone" required class="glass-input">
-                <input type="text" id="addr-pincode" placeholder="Pincode" required class="glass-input">
-                <input type="text" id="addr-city" placeholder="City" required class="glass-input">
-                <input type="text" id="addr-state" placeholder="State" required class="glass-input">
-                <textarea id="addr-full" placeholder="Full Address" required class="glass-input" rows="3"></textarea>
-                <button type="submit" class="btn btn-gold full-width">Save Address</button>
-                <button type="button" onclick="closeAddressModal()" class="btn btn-outline full-width">Cancel</button>
+            <form id="address-form" style="display: flex; flex-direction: column; gap: 12px;">
+                <input type="hidden" id="address-id">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <input type="text" id="addr-name" placeholder="Full Name" required class="glass-input">
+                    <input type="tel" id="addr-phone" placeholder="Mobile Number (10 digits)" required
+                        class="glass-input" pattern="[0-9]{10}">
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                    <input type="text" id="addr-pincode" placeholder="Pincode (6 digits)" required class="glass-input"
+                        pattern="[0-9]{6}">
+                    <input type="text" id="addr-city" placeholder="City" required class="glass-input">
+                    <input type="text" id="addr-state" placeholder="State" required class="glass-input">
+                </div>
+                <input type="text" id="addr-house" placeholder="House No / Building Name" required class="glass-input">
+                <input type="text" id="addr-area" placeholder="Area / Street / Locality" required class="glass-input">
+                <input type="text" id="addr-landmark" placeholder="Landmark (Optional)" class="glass-input">
+
+                <div class="address-type-group" style="display: flex; gap: 20px; color: white; margin-top: 5px;">
+                    <label style="cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                        <input type="radio" name="addr-type" value="Home" checked> Home
+                    </label>
+                    <label style="cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                        <input type="radio" name="addr-type" value="Work"> Work
+                    </label>
+                </div>
+
+                <div class="checkbox-group"
+                    style="display: flex; align-items: center; gap: 10px; color: white; font-size: 0.9rem;">
+                    <input type="checkbox" id="addr-default" style="cursor: pointer;">
+                    <label for="addr-default" style="cursor: pointer;">Set as default address</label>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <button type="submit" class="btn btn-gold" style="flex: 2;">Save Address</button>
+                    <button type="button" onclick="closeAddressModal()" class="btn btn-outline"
+                        style="flex: 1;">Cancel</button>
+                </div>
             </form>
+        </div>
+    </div>
+
+    <!-- CHECKOUT OVERLAY (Multi-step) -->
+    <div id="checkout-overlay" class="reader-overlay" style="display: none; z-index: 10000;">
+        <div class="reader-toolbar glass-panel">
+            <div class="reader-title"><i class="fas fa-shield-check gold-text"></i> Secure Checkout</div>
+            <button class="btn-icon" onclick="closeCheckout()"><i class="fas fa-times"></i></button>
+        </div>
+
+        <div class="reader-canvas-container"
+            style="justify-content: center; align-items: flex-start; padding-top: 50px; padding-bottom: 50px; overflow-y: auto;">
+            <div class="checkout-container"
+                style="width: 95%; max-width: 900px; display: grid; grid-template-columns: 1fr 350px; gap: 30px;">
+
+                <!-- Left Side: Steps -->
+                <div class="checkout-steps-col">
+
+                    <!-- STEP 1: ADDRESS -->
+                    <div id="checkout-step-address" class="checkout-step-card glass-panel active"
+                        style="padding: 30px; margin-bottom: 20px;">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+                            <h3 style="margin: 0;"><span class="step-num">1</span> Select Delivery Address</h3>
+                            <button class="btn btn-gold small" onclick="openAddressModal()"><i class="fas fa-plus"></i>
+                                Add New</button>
+                        </div>
+                        <div id="checkout-address-list" class="checkout-address-grid"
+                            style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                            <!-- Addresses injected here -->
+                        </div>
+                        <div style="margin-top: 30px; text-align: right;">
+                            <button id="btn-confirm-address" class="btn btn-gold" onclick="continueToSummary()"
+                                disabled>Deliver to Selected Address</button>
+                        </div>
+                    </div>
+
+                    <!-- STEP 2: SUMMARY -->
+                    <div id="checkout-step-summary" class="checkout-step-card glass-panel"
+                        style="padding: 30px; opacity: 0.5; pointer-events: none;">
+                        <h3 style="margin-bottom: 25px;"><span class="step-num">2</span> Order Summary</h3>
+                        <div id="checkout-items-summary" class="summary-items-list">
+                            <!-- Items injected here -->
+                        </div>
+                        <div class="delivery-address-preview"
+                            style="margin-top: 25px; padding: 20px; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+                            <h5 style="color: var(--gold-text); margin-bottom: 10px;">Shipping To:</h5>
+                            <p id="selected-address-preview" style="font-size: 0.9rem; opacity: 0.8; margin: 0;"></p>
+                        </div>
+                        <div style="margin-top: 30px; display: flex; justify-content: space-between;">
+                            <button class="btn btn-outline" onclick="backToAddress()">Back</button>
+                            <button class="btn btn-gold" onclick="proceedToPayment()">Confirm & Pay Now</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Side: Pricing Sticky -->
+                <div class="checkout-pricing-col">
+                    <div class="glass-panel pricing-card" style="padding: 25px; position: sticky; top: 0;">
+                        <h4
+                            style="margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 15px;">
+                            Payment Details</h4>
+                        <div class="price-rows" style="display: flex; flex-direction: column; gap: 12px;">
+                            <div style="display: flex; justify-content: space-between; opacity: 0.7;">
+                                <span>Cart Subtotal</span>
+                                <span id="chk-subtotal">₹0.00</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; opacity: 0.7;">
+                                <span>Delivery Charges</span>
+                                <span style="color: #4CAF50;">FREE</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; opacity: 0.7;">
+                                <span>Tax (GST 18%)</span>
+                                <span id="chk-tax">₹0.00</span>
+                            </div>
+                            <div
+                                style="display: flex; justify-content: space-between; margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); font-weight: 800; font-size: 1.2rem; color: var(--gold-text);">
+                                <span>Total Payable</span>
+                                <span id="chk-total">₹0.00</span>
+                            </div>
+                        </div>
+                        <p style="margin-top: 25px; font-size: 0.75rem; opacity: 0.4; text-align: center;">
+                            <i class="fas fa-lock"></i> 256-bit SSL Secure Payment
+                        </p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 

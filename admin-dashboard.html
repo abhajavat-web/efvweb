@@ -54,7 +54,7 @@
                 <a href="marketplace.html" class="nav-item" id="nav-back-to-shop">
                     <i class="fas fa-shopping-bag"></i> <span>Browse Store</span>
                 </a>
-                <button class="nav-item active" data-tab="dashboard">
+                <button class="nav-item active" data-tab="admin" id="sidebar-dashboard-btn">
                     <i class="fas fa-th-large"></i> <span>Dashboard</span>
                 </button>
                 <button class="nav-item" data-tab="cart">
@@ -120,8 +120,8 @@
         <!-- RIGHT CONTENT AREA -->
         <main class="main-content">
 
-            <!-- ADMIN DASHBOARD OVERVIEW TAB -->
-            <section id="dashboard" class="content-section active">
+            <!-- USER DASHBOARD OVERVIEW TAB (Hidden for Admins by default, mapped to Admin Portal) -->
+            <section id="dashboard" class="content-section">
                 <header class="content-header">
                     <div class="welcome-text">
                         <h1 class="gradient-text">Admin <span class="gold-text">Command Center</span></h1>
@@ -800,7 +800,7 @@
             </section>
 
             <!-- ADMIN PORTAL TAB (Home) -->
-            <section id="admin" class="content-section">
+            <section id="admin" class="content-section active">
                 <header class="content-header">
                     <h1>Admin <span class="gold-text">Portal</span></h1>
                     <p>Management & Analytics Dashboard</p>
@@ -865,6 +865,18 @@
                     <h1>Orders <span class="gold-text">Management</span></h1>
                     <p>Track and manage customer purchases</p>
                 </header>
+
+                <!-- Order Controls -->
+                <div class="admin-controls glass-panel"
+                    style="margin-bottom: 20px; padding: 15px; display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                    <div class="search-box" style="flex: 1; min-width: 250px; position: relative;">
+                        <i class="fas fa-search"
+                            style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); opacity: 0.5;"></i>
+                        <input type="text" id="admin-order-search"
+                            placeholder="Search by Order ID, Customer Name or Phone..." oninput="filterAdminOrders()"
+                            style="width: 100%; padding: 10px 15px 10px 45px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: white;">
+                    </div>
+                </div>
                 <div class="settings-card glass-panel" style="padding: 20px; overflow-x: auto;">
                     <table style="width: 100%; border-collapse: collapse; min-width: 1000px;">
                         <thead>

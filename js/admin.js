@@ -144,14 +144,20 @@ window.updateAdminStats = async function () {
             fetch(`${API_BASE}/api/users`, { headers: { 'Authorization': `Bearer ${token}` } }).catch(() => ({}))
         ]);
 
-        const products = await productsRes.json();
-        const orders = ordersRes.ok ? await ordersRes.json() : [];
+        const productsJson = await productsRes.json();
+        const ordersJson = ordersRes.ok ? await ordersRes.json() : [];
+
+        const products = Array.isArray(productsJson) ? productsJson : [];
+        const orders = Array.isArray(ordersJson) ? ordersJson : [];
         let users = [];
-        if (usersRes && usersRes.ok) users = await usersRes.json();
+        if (usersRes && usersRes.ok) {
+            const usersJson = await usersRes.json().catch(() => []);
+            users = Array.isArray(usersJson) ? usersJson : [];
+        }
 
         const revenue = orders.reduce((sum, o) => {
-            if (['Failed', 'Cancelled', 'Returned'].includes(o.status)) return sum;
-            return sum + (o.totalAmount || 0);
+            if (!o || ['Failed', 'Cancelled', 'Returned'].includes(o.status)) return sum;
+            return sum + (Number(o.totalAmount) || 0);
         }, 0);
 
         const totalProdEl = document.getElementById('admin-stat-total-products');
@@ -199,9 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Role-Based Page Protection
     const isProfilePage = window.location.pathname.includes('profile.html');
     const isAdminPage = window.location.pathname.includes('admin-dashboard.html');
-    const isAdmin = user && (user.role === 'admin' || user.email.toLowerCase() === 'admin@uwo24.com');
-
-    // 1. If Non-Admin tries to access Admin Dashboard -> Bounce to Profile
+    const isAdmin = user && (user.role === 'admin' || (user.email && user.email.toLowerCase() === 'admin@uwo24.com'));
     if (isAdminPage && !isAdmin) {
         console.warn("Security: Unauthorized admin access attempt.");
         window.location.href = 'profile.html';
@@ -270,8 +274,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Global switchTab Helper
     window.switchTab = function (tabId, subTab = null) {
         const user = JSON.parse(localStorage.getItem('efv_user'));
-        const isAdmin = user && (user.role === 'admin' || user.email.toLowerCase() === 'admin@uwo24.com');
+        const isAdmin = user && (user.role === 'admin' || (user.email && user.email.toLowerCase() === 'admin@uwo24.com'));
         let effectiveTabId = tabId;
+
+        // Map 'dashboard' to 'admin' for admins on this page
+        if (tabId === 'dashboard' && isAdmin) effectiveTabId = 'admin';
 
         // Redirect Admin to Admin Settings
         if (tabId === 'settings' && isAdmin) effectiveTabId = 'admin-settings';
@@ -543,6 +550,11 @@ window.loadAdminSupport = async function () {
         const messages = await res.json();
 
         if (!res.ok) throw new Error(messages.message || 'Failed to fetch');
+
+        if (!Array.isArray(messages)) {
+            tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px; opacity: 0.5;">No support message data available.</td></tr>';
+            return;
+        }
 
         if (messages.length === 0) {
             tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px; opacity: 0.5;">No support messages found.</td></tr>';
@@ -1870,44 +1882,78 @@ function getImageForProduct(name) {
 // --- NEW ADMIN MANAGEMENT FUNCTIONS ---
 
 
+let allAdminOrders = [];
+
 window.loadAdminOrdersFull = async function () {
     const tbody = document.getElementById('admin-orders-table-body');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px;">Loading orders...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Loading orders...</td></tr>';
 
     try {
         const token = localStorage.getItem('authToken');
         const res = await fetch(`${API_BASE}/api/orders`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        const orders = await res.json();
+        allAdminOrders = await res.json();
+        window.filterAdminOrders(); // Initial render
+    } catch (e) {
+        console.error(e);
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px; color:var(--error);">Failed to load orders.</td></tr>';
+    }
+};
 
-        tbody.innerHTML = '';
-        orders.reverse().forEach(o => {
-            const date = new Date(o.createdAt).toLocaleDateString();
-            const items = o.items.map(i => `${i.quantity}x ${i.title}`).join(', ');
-            const tr = document.createElement('tr');
-            tr.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
-            tr.innerHTML = `
-                <td style="padding: 12px; font-family: monospace;">#${o._id.slice(-6)}</td>
-                <td style="padding: 12px;">${date}</td>
-                <td style="padding: 12px;">${o.customer.name}<br><small style="opacity:0.6;">${o.customer.phone || 'N/A'}</small></td>
-                <td style="padding: 12px;"><div style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${items}</div></td>
-                <td style="padding: 12px; font-weight:bold;">₹${o.totalAmount}</td>
-                <td style="padding: 12px;"><span class="badge ${o.paymentStatus === 'Paid' ? 'green' : 'gold'}">${o.paymentStatus}</span></td>
-                <td style="padding: 12px;">
-                    <select onchange="updateOrderStatus('${o._id}', this.value)" style="background: rgba(0,0,0,0.3); color: white; border: 1px solid rgba(255,211,105,0.3); padding: 4px; border-radius: 4px; font-size: 0.8rem;">
-                        ${['Pending', 'Processing', 'Packed', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled', 'Returned', 'Failed'].map(s => `<option value="${s}" ${o.status === s ? 'selected' : ''}>${s}</option>`).join('')}
-                    </select>
-                </td>
-                <td style="padding: 12px;">
-                    <button class="btn btn-outline small" onclick="viewAdminOrderDetail('${o._id}')">View</button>
-                    <button class="btn-icon" style="color: #ff4d4d; margin-left:10px;" onclick="window.deleteOrder('${o._id}')"><i class="fas fa-trash"></i></button>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
-    } catch (e) { console.error(e); }
+window.filterAdminOrders = function () {
+    const tbody = document.getElementById('admin-orders-table-body');
+    const searchInput = document.getElementById('admin-order-search');
+    if (!tbody) return;
+
+    const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+
+    if (!Array.isArray(allAdminOrders)) {
+        console.warn("allAdminOrders is not an array:", allAdminOrders);
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 40px; opacity:0.5;">No orders data available.</td></tr>';
+        return;
+    }
+
+    const filtered = allAdminOrders.filter(o => {
+        if (!o) return false;
+        const id = String(o.orderId || o._id || '').toLowerCase();
+        const name = (o.customer && o.customer.name || '').toLowerCase();
+        const phone = (o.customer && o.customer.phone || '').toLowerCase();
+        return id.includes(searchTerm) || name.includes(searchTerm) || phone.includes(searchTerm);
+    });
+
+    tbody.innerHTML = '';
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 40px; opacity:0.5;">No orders found matching your search.</td></tr>';
+        return;
+    }
+
+    filtered.forEach(o => {
+        const date = new Date(o.createdAt).toLocaleDateString();
+        const items = o.items.map(i => `${i.quantity}x ${i.title}`).join(', ');
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+        tr.innerHTML = `
+            <td style="padding: 12px; font-family: monospace;">#${(o.orderId || o._id.slice(-6))}</td>
+            <td style="padding: 12px;">${date}</td>
+            <td style="padding: 12px;">${o.customer.name}<br><small style="opacity:0.6;">${o.customer.phone || 'N/A'}</small></td>
+            <td style="padding: 12px;"><div style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${items}</div></td>
+            <td style="padding: 12px; font-weight:bold;">₹${o.totalAmount}</td>
+            <td style="padding: 12px;"><span class="badge ${o.paymentStatus === 'Paid' ? 'green' : 'gold'}">${o.paymentStatus}</span></td>
+            <td style="padding: 12px;">
+                <select onchange="updateOrderStatus('${o._id}', this.value)" style="background: rgba(0,0,0,0.3); color: white; border: 1px solid rgba(255,211,105,0.3); padding: 4px; border-radius: 4px; font-size: 0.8rem;">
+                    ${['Pending', 'Processing', 'Packed', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled', 'Returned', 'Failed'].map(s => `<option value="${s}" ${o.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+                </select>
+            </td>
+            <td style="padding: 12px;">
+                <button class="btn btn-outline small" onclick="viewAdminOrderDetail('${o._id}')">View</button>
+                <button class="btn-icon" style="color: #ff4d4d; margin-left:10px;" onclick="window.deleteOrder('${o._id}')"><i class="fas fa-trash"></i></button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
 };
 
 window.filterAdminProducts = function () {
@@ -1921,8 +1967,14 @@ window.filterAdminProducts = function () {
     const typeFilter = typeEl.value;
     const stockFilter = stockEl.value;
 
+    if (!Array.isArray(allAdminProducts)) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 40px; opacity:0.5;">No products data available.</td></tr>';
+        return;
+    }
+
     let filtered = allAdminProducts.filter(p => {
-        const matchesSearch = p.title.toLowerCase().includes(searchTerm) || (p.author && p.author.toLowerCase().includes(searchTerm));
+        if (!p) return false;
+        const matchesSearch = (p.title || '').toLowerCase().includes(searchTerm) || (p.author && p.author.toLowerCase().includes(searchTerm));
 
         let matchesType = true;
         if (typeFilter === 'physical') {
@@ -2013,11 +2065,11 @@ window.renderAdminProducts = function (products) {
                 (p.filePath ?
                     `<div style="display:flex; flex-direction:column; gap:4px;">
                             <span style="color: #2ecc71; font-size: 0.75rem;"><i class="fas fa-check-circle"></i> OK</span>
-                            <button onclick="window.editProduct('${p._id}')" style="background:none; border:none; color:var(--gold-text); font-size:0.7rem; cursor:pointer; padding:0; text-align:left; text-decoration:underline;">Update File</button>
+                            <button onclick="window.openProductModal('${p._id}')" style="background:none; border:none; color:var(--gold-text); font-size:0.7rem; cursor:pointer; padding:0; text-align:left; text-decoration:underline;">Update File</button>
                         </div>` :
                     `<div style="display:flex; flex-direction:column; gap:4px;">
                             <span style="color: #ff4d4d; font-size: 0.75rem;"><i class="fas fa-exclamation-triangle"></i> Missing</span>
-                            <button onclick="window.editProduct('${p._id}')" class="btn btn-gold small" style="padding: 2px 8px; font-size: 0.65rem; width:auto;">Upload Now</button>
+                            <button onclick="window.openProductModal('${p._id}')" class="btn btn-gold small" style="padding: 2px 8px; font-size: 0.65rem; width:auto;">Upload Now</button>
                         </div>`)
                 : '<span style="opacity: 0.3; font-size: 0.75rem;">N/A (Physical)</span>'}
             </td>
@@ -2029,7 +2081,7 @@ window.renderAdminProducts = function (products) {
             </td>
             <td style="padding: 12px;">
                 <div style="display: flex; gap: 5px;">
-                    <button onclick="window.editProduct('${p._id}')" class="btn-icon" style="color: var(--gold-text);" title="Edit Product"><i class="fas fa-edit"></i></button>
+                    <button onclick="window.openProductModal('${p._id}')" class="btn-icon" style="color: var(--gold-text);" title="Edit Product"><i class="fas fa-edit"></i></button>
                     <button onclick="window.deleteProduct('${p._id}')" class="btn-icon" style="color: #ff4d4d;" title="Delete Product"><i class="fas fa-trash"></i></button>
                 </div>
             </td>
@@ -2054,9 +2106,15 @@ window.loadAdminCustomers = async function () {
         const orders = await ordersRes.json();
 
         tbody.innerHTML = '';
+        if (!Array.isArray(users)) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px; opacity:0.5;">No users found.</td></tr>';
+            return;
+        }
+
         users.forEach(u => {
-            const userOrders = orders.filter(o => o.customer.email.toLowerCase() === u.email.toLowerCase());
-            const totalSpent = userOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+            if (!u || !u.email) return;
+            const userOrders = Array.isArray(orders) ? orders.filter(o => o.customer && o.customer.email && o.customer.email.toLowerCase() === u.email.toLowerCase()) : [];
+            const totalSpent = userOrders.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
 
             const tr = document.createElement('tr');
             tr.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
@@ -2086,6 +2144,12 @@ window.loadAdminPayments = async function () {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const payments = await res.json();
+
+        if (!Array.isArray(payments)) {
+            tbody.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center; opacity:0.5;">No payment data available.</td></tr>';
+            return;
+        }
+
         tbody.innerHTML = payments.length ? '' : '<tr><td colspan="6" style="padding:20px; text-align:center; opacity:0.5;">No payment records found.</td></tr>';
         payments.forEach(p => {
             const tr = document.createElement('tr');
@@ -2109,13 +2173,19 @@ window.loadAdminPayments = async function () {
 window.loadAdminShipments = async function () {
     const tbody = document.getElementById('admin-shipments-table-body');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center;">Loading shipments...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center;"><i class="fas fa-spinner fa-spin"></i> Loading shipments...</td></tr>';
     try {
         const token = localStorage.getItem('authToken');
         const res = await fetch(`${API_BASE}/api/shipments`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const shipments = await res.json();
+
+        if (!Array.isArray(shipments)) {
+            tbody.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center; opacity:0.5;">No shipment data available.</td></tr>';
+            return;
+        }
+
         tbody.innerHTML = shipments.length ? '' : '<tr><td colspan="6" style="padding:20px; text-align:center; opacity:0.5;">No active shipments.</td></tr>';
         shipments.forEach(s => {
             const tr = document.createElement('tr');
@@ -2123,16 +2193,42 @@ window.loadAdminShipments = async function () {
             tr.innerHTML = `
                         <td style="padding: 12px; font-family: monospace;">#${s.orderId ? s.orderId.slice(-6) : 'N/A'}</td>
                         <td style="padding: 12px;">${s.courierName || 'Pending'}</td>
-                        <td style="padding: 12px;">${s.awbNumber || 'Generating...'}</td>
+                        <td style="padding: 12px;">
+                            <div style="font-weight:600;">${s.awbNumber || 'Generating...'}</div>
+                            ${s.awbNumber ? `<button onclick="window.trackNimbusShipment('${s.awbNumber}')" class="btn btn-outline tiny" style="margin-top:5px; font-size:0.65rem; padding:2px 8px;">LIVE TRK</button>` : ''}
+                        </td>
                         <td style="padding: 12px;"><span class="badge ${s.shippingStatus === 'Delivered' ? 'green' : 'gold'}">${s.shippingStatus}</span></td>
-                        <td style="padding: 12px;">${s.labelUrl ? `<a href="${s.labelUrl}" target="_blank" class="btn btn-outline small">View Label</a>` : 'N/A'}</td>
-                        <td style="padding: 12px;">${s.trackingLink ? `<a href="${s.trackingLink}" target="_blank" class="btn btn-outline small">Track</a>` : 'N/A'}</td>
+                        <td style="padding: 12px;">${s.labelUrl ? `<a href="${s.labelUrl}" target="_blank" class="btn btn-outline small">View Label</a>` : '<span style="opacity:0.3;">N/A</span>'}</td>
+                        <td style="padding: 12px;">${s.trackingLink ? `<a href="${s.trackingLink}" target="_blank" class="btn btn-outline small">Track Page</a>` : '<span style="opacity:0.3;">N/A</span>'}</td>
                     `;
             tbody.appendChild(tr);
         });
     } catch (e) {
         console.error(e);
         tbody.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center; color:#ff6b6b;">Error loading shipments.</td></tr>';
+    }
+};
+
+window.trackNimbusShipment = async function (awb) {
+    if (!awb) return;
+    showToast("Fetching live tracking...", "info");
+    try {
+        const token = localStorage.getItem('authToken');
+        const res = await fetch(`${API_BASE}/api/shipments/track/${awb}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await res.json();
+        if (result.status && result.data) {
+            const latest = result.data.history ? result.data.history[0] : null;
+            const status = result.data.status_name || result.data.status || "Unknown";
+            const location = result.data.location || "";
+            alert(`Live Status: ${status}\nLocation: ${location}\nLast Updated: ${latest ? latest.event_time : 'N/A'}`);
+        } else {
+            alert(result.message || "Tracking info not available yet.");
+        }
+    } catch (e) {
+        console.error(e);
+        showToast("Tracking failed", "error");
     }
 };
 
@@ -2355,14 +2451,20 @@ window.viewAdminOrderDetail = async function (id) {
         }
 
         // Address
-        const addr = order.customer;
+        const addr = order.customer || {};
         const addrContainer = document.getElementById('modal-shipping-address');
         if (addrContainer) {
-            addrContainer.innerHTML = `
-                ${addr.name}<br>
-                ${addr.address}<br>
-                Phone: ${addr.phone || 'N/A'}
-            `;
+            let addressHtml = addr.name || 'Anonymous';
+
+            if (typeof addr.address === 'object' && addr.address !== null) {
+                const a = addr.address;
+                addressHtml += `<br>${a.street || a.house || ''}<br>${a.city || ''} ${a.zip || a.pincode || ''}`;
+            } else {
+                addressHtml += `<br>${addr.address || 'N/A'}`;
+            }
+
+            addressHtml += `<br>Phone: ${addr.phone || order.phone || 'N/A'}`;
+            addrContainer.innerHTML = addressHtml;
         }
 
         // Timeline
@@ -2387,9 +2489,67 @@ window.viewAdminOrderDetail = async function (id) {
         modal.style.display = 'flex';
         modal.classList.add('active');
 
+        // Add Create Shipment button if physical and not shipped
+        const isPhysical = order.items.some(i => ['HARDCOVER', 'PAPERBACK'].includes(i.type));
+        const canShip = isPhysical && !['Shipped', 'Delivered', 'Cancelled'].includes(order.status);
+
+        const actionsContainer = document.querySelector('.detail-right');
+        if (actionsContainer) {
+            // Remove existing shipment btn if any
+            const existingBtn = document.getElementById('btn-create-shipment');
+            if (existingBtn) existingBtn.remove();
+
+            if (canShip) {
+                const shipBtn = document.createElement('button');
+                shipBtn.id = 'btn-create-shipment';
+                shipBtn.className = 'btn btn-gold full-width';
+                shipBtn.style.marginTop = '15px';
+                shipBtn.innerHTML = '<i class="fas fa-shipping-fast"></i> CREATE NIMBUS SHIPMENT';
+                shipBtn.onclick = () => window.createNimbusShipment(order._id);
+                actionsContainer.appendChild(shipBtn);
+            }
+        }
+
     } catch (e) {
         console.error("Error loading order:", e);
         showToast("Error loading order details", "error");
+    }
+};
+
+window.createNimbusShipment = async function (orderId) {
+    if (!confirm("Are you sure you want to create a NimbusPost shipment for this order?")) return;
+
+    const btn = document.getElementById('btn-create-shipment');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+    btn.disabled = true;
+
+    try {
+        const token = localStorage.getItem('authToken');
+        const res = await fetch(`${API_BASE}/api/shipments/create`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ orderId })
+        });
+
+        const result = await res.json();
+        if (res.ok) {
+            showToast("Shipment created successfully!", "success");
+            window.viewAdminOrderDetail(orderId); // Refresh details
+            if (document.getElementById('admin-orders').classList.contains('active')) window.loadAdminOrdersFull();
+            if (document.getElementById('admin-shipments').classList.contains('active')) window.loadAdminShipments();
+        } else {
+            alert(result.message || "Failed to create shipment");
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Error creating shipment");
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
     }
 };
 

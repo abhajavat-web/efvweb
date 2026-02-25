@@ -242,23 +242,28 @@ document.addEventListener('DOMContentLoaded', () => {
             const backendProducts = await response.json();
             if (!Array.isArray(backendProducts)) return;
 
-            // Update static list with backend data
+            // Create a combined list starting with our static products
+            let combinedProducts = [...STATIC_PRODUCTS];
+
+            // Update existing products and add NEW ones from backend
             backendProducts.forEach(b => {
-                const staticIndex = STATIC_PRODUCTS.findIndex(sp => sp._id === b._id);
+                const staticIndex = combinedProducts.findIndex(sp => sp._id === b._id);
                 if (staticIndex !== -1) {
-                    // Only update existing products, don't add new ones
-                    // Preserve language and thumbnail from static catalog (backend must not override these)
+                    // Update existing static product
                     const preserved = {
-                        language: STATIC_PRODUCTS[staticIndex].language,
-                        thumbnail: STATIC_PRODUCTS[staticIndex].thumbnail
+                        language: combinedProducts[staticIndex].language,
+                        thumbnail: combinedProducts[staticIndex].thumbnail || b.thumbnail
                     };
-                    STATIC_PRODUCTS[staticIndex] = { ...STATIC_PRODUCTS[staticIndex], ...b, ...preserved };
+                    combinedProducts[staticIndex] = { ...combinedProducts[staticIndex], ...b, ...preserved };
+                } else {
+                    // Add completely NEW product that isn't in static list
+                    combinedProducts.push(b);
                 }
             });
 
-            // Re-render EVERYTHING to ensure price/desc/title updates are visible
-            console.log('🔄 Marketplace: Applying backend updates...');
-            renderProducts(STATIC_PRODUCTS, true);
+            // Re-render EVERYTHING to ensure all updates and new arrivals are visible
+            console.log('🔄 Marketplace: Applying backend updates & new products...');
+            renderProducts(combinedProducts, true);
         } catch (err) {
             console.log('ℹ️ Marketplace: Offline mode or timeout — using static catalog');
         }

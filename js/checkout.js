@@ -139,7 +139,10 @@ async function initRazorpay(order) {
     try {
         const response = await fetch(`${API_BASE}/api/orders/razorpay`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            },
             body: JSON.stringify({ amount: order.totalAmount })
         });
 
@@ -185,7 +188,10 @@ async function verifyPayment(rzpResp, localOrder, rzpData) {
     try {
         const res = await fetch(`${API_BASE}/api/orders/verify`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            },
             body: JSON.stringify({
                 razorpay_order_id: rzpResp.razorpay_order_id,
                 razorpay_payment_id: rzpResp.razorpay_payment_id,

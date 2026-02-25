@@ -185,6 +185,20 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // 3.3 Checkout (NEW)
+    const checkoutBtn = document.getElementById('proceed-to-checkout-btn');
+    if (checkoutBtn) {
+        checkoutBtn.addEventListener('click', () => {
+            const cartKey = getUserKey('efv_cart');
+            const cart = JSON.parse(localStorage.getItem(cartKey)) || [];
+            if (cart.length === 0) {
+                showToast("Your cart is empty", "error");
+                return;
+            }
+            initiateDashboardCheckout(cart, false);
+        });
+    }
+
     // 4. Logout
     window.logoutAction = () => {
         if (confirm('Are you sure you want to log out?')) {
@@ -224,6 +238,55 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (err) {
                 console.error(err);
                 showToast("Server error", "error");
+            }
+        });
+    }
+
+    // 6. Change Password Listener
+    const changePassForm = document.getElementById('change-password-form');
+    if (changePassForm) {
+        changePassForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const token = localStorage.getItem('authToken');
+            const currentPassword = document.getElementById('current-password').value;
+            const newPassword = document.getElementById('new-password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+
+            if (newPassword !== confirmPassword) {
+                showToast("Passwords do not match", "error");
+                return;
+            }
+
+            if (newPassword.length < 6) {
+                showToast("Password must be at least 6 characters", "error");
+                return;
+            }
+
+            const btn = document.getElementById('change-pass-btn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/users/change-password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ currentPassword, newPassword })
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    showToast("Password updated successfully", "success");
+                    changePassForm.reset();
+                } else {
+                    showToast(data.message || "Failed to update password", "error");
+                }
+            } catch (err) {
+                console.error(err);
+                showToast("Server error", "error");
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
             }
         });
     }
@@ -620,13 +683,7 @@ async function updateReadingProgressShortcuts() {
     `;
 }
 
-function getStatusClass(status) {
-    if (['Delivered', 'Completed', 'Processing'].includes(status)) return 'green-badge';
-    if (['Shipped', 'Paid'].includes(status)) return 'gold-badge';
-    if (['Cancelled', 'Failed', 'Payment Failed'].includes(status)) return 'red-badge';
-    if (['Awaiting Payment'].includes(status)) return 'gold-badge';
-    return '';
-}
+// Status helpers removed (consolidated at end)
 
 window.syncLibraryWithBackend = async function () {
     const user = JSON.parse(localStorage.getItem('efv_user'));
@@ -774,10 +831,14 @@ window.renderSavedAddresses = function () {
 
     container.innerHTML = profile.savedAddresses.map(addr => `
         <div class="address-card glass-panel ${addr.isDefault ? 'default' : ''}">
-            <h5 style="color:var(--gold-text); margin-bottom:10px;">${addr.label || 'Address'} ${addr.isDefault ? '<span class="default-badge">Default</span>' : ''}</h5>
+            <h5 style="color:var(--gold-text); margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+                <span>${addr.type || 'Home'} ${addr.isDefault ? '<span class="default-badge">Default</span>' : ''}</span>
+                <i class="fas ${addr.type === 'Work' ? 'fa-briefcase' : 'fa-home'}" style="opacity:0.3;"></i>
+            </h5>
             <p class="address-text">
                 <strong>${addr.fullName}</strong><br>
-                ${addr.fullAddress}<br>
+                ${addr.house}, ${addr.area}<br>
+                ${addr.landmark ? `<span style="font-size:0.8rem; opacity:0.6;">Landmark: ${addr.landmark}</span><br>` : ''}
                 ${addr.city}, ${addr.state} - ${addr.pincode}<br>
                 Phone: ${addr.phone}
             </p>
@@ -929,7 +990,7 @@ function renderLibraryTab(directData = null) {
             <div class="dashboard-card fade-in">
                 <div class="card-image-container">
                     <span class="card-type-badge">${item.type}</span>
-                    <img src="${item.thumbnail}" alt="${item.name}" class="card-image">
+                    <img src="${item.thumbnail || 'img/vol1-cover.png'}" alt="${item.name}" class="card-image" onerror="this.src='img/vol1-cover.png'">
                 </div>
                 <div class="card-details">
                     ${item.language ? `<span style="display:inline-block; background: rgba(212,175,55,0.15); border: 1px solid var(--gold-energy); color: var(--gold-energy); padding: 1px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-bottom: 5px; text-transform: uppercase;">${item.language} Edition</span>` : ''}
@@ -986,91 +1047,274 @@ window.buyNowFromDashboard = function (id) {
     initiateDashboardCheckout([item], true, id);
 };
 
-async function initiateDashboardCheckout(items, isSingleItemMode, cartIndexToRemove) {
-    const user = JSON.parse(localStorage.getItem('efv_user'));
-    const totalAmount = items.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+// --- SECURE MULTI-STEP CHECKOUT SYSTEM ---
+window.checkoutState = {
+    items: [],
+    selectedAddressId: null,
+    isSingleItemMode: false,
+    cartIdToRemove: null
+};
 
-    // Basic Razorpay options since we don't have the full backend integration setup in this file
-    // Ideally we call the same backend endpoints
+window.initiateDashboardCheckout = async function (items, isSingleItemMode = false, cartIdToRemove = null) {
+    if (!items || items.length === 0) {
+        showToast("No items to checkout", "error");
+        return;
+    }
+
+    window.checkoutState = {
+        items: items,
+        selectedAddressId: null,
+        isSingleItemMode: isSingleItemMode,
+        cartIdToRemove: cartIdToRemove
+    };
+
+    const overlay = document.getElementById('checkout-overlay');
+    if (overlay) {
+        overlay.style.display = 'flex';
+        document.body.classList.add('modal-open');
+        renderCheckoutPricing();
+        renderCheckoutAddresses();
+        backToAddress(); // Reset to step 1
+    }
+};
+
+window.closeCheckout = () => {
+    const overlay = document.getElementById('checkout-overlay');
+    if (overlay) {
+        overlay.style.display = 'none';
+        document.body.classList.remove('modal-open');
+    }
+};
+
+function renderCheckoutPricing() {
+    const items = window.checkoutState.items;
+    const subtotal = items.reduce((sum, i) => sum + (parseFloat(i.price) * (parseInt(i.quantity) || 1)), 0);
+    const tax = subtotal * 0.18;
+    const total = subtotal + tax;
+
+    if (document.getElementById('chk-subtotal')) document.getElementById('chk-subtotal').textContent = `₹${subtotal.toFixed(2)}`;
+    if (document.getElementById('chk-tax')) document.getElementById('chk-tax').textContent = `₹${tax.toFixed(2)}`;
+    if (document.getElementById('chk-total')) document.getElementById('chk-total').textContent = `₹${total.toFixed(2)}`;
+}
+
+window.renderCheckoutAddresses = function () {
+    const profile = window.currentUserProfile;
+    const list = document.getElementById('checkout-address-list');
+    if (!list) return;
+
+    if (!profile || !profile.savedAddresses || profile.savedAddresses.length === 0) {
+        list.innerHTML = `
+            <div style="grid-column: 1 / -1; padding: 40px; text-align: center; border: 2px dashed rgba(212, 175, 55, 0.2); border-radius: 20px; background: rgba(212, 175, 55, 0.02);">
+                <i class="fas fa-map-marker-alt" style="font-size: 3rem; color: var(--gold-text); margin-bottom: 20px; opacity: 0.5;"></i>
+                <h3 style="margin-bottom: 10px;">No saved addresses</h3>
+                <p style="opacity:0.6; margin-bottom: 25px;">Please add a delivery address to proceed with your order.</p>
+                <button class="btn btn-gold" onclick="openAddressModal()">Add New Address</button>
+            </div>`;
+
+        // Auto-popup for a smoother flow if no addresses exist
+        setTimeout(() => {
+            if (document.getElementById('checkout-overlay').style.display === 'flex') {
+                openAddressModal();
+            }
+        }, 500);
+        return;
+    }
+
+    list.innerHTML = profile.savedAddresses.map(addr => {
+        const id = addr._id || addr.id;
+        const isSelected = window.checkoutState.selectedAddressId === id || (addr.isDefault && !window.checkoutState.selectedAddressId);
+        if (isSelected && !window.checkoutState.selectedAddressId) window.checkoutState.selectedAddressId = id;
+
+        return `
+            <div class="checkout-address-card glass-panel ${isSelected ? 'selected' : ''}" 
+                 onclick="selectCheckoutAddress('${id}')" 
+                 style="padding: 20px; cursor: pointer; border: 1px solid ${isSelected ? 'var(--gold-text)' : 'rgba(255,255,255,0.05)'}; transition: all 0.2s; position: relative; border-radius: 12px;">
+                <div style="position: absolute; top: 15px; right: 15px;">
+                    <i class="fas ${isSelected ? 'fa-check-circle' : 'fa-circle'}" style="color: ${isSelected ? 'var(--gold-text)' : 'rgba(255,255,255,0.1)'};"></i>
+                </div>
+                <h5 style="margin: 0 0 10px; color: ${isSelected ? 'var(--gold-text)' : '#fff'}; font-size: 0.95rem;">${addr.type || 'Home'}</h5>
+                <p style="font-size: 0.85rem; opacity: 0.8; margin: 0; line-height: 1.5;">
+                    <strong>${addr.fullName}</strong><br>
+                    ${addr.house}, ${addr.area}<br>
+                    ${addr.city}, ${addr.state} - ${addr.pincode}
+                </p>
+            </div>
+        `;
+    }).join('');
+
+    document.getElementById('btn-confirm-address').disabled = !window.checkoutState.selectedAddressId;
+};
+
+window.selectCheckoutAddress = (id) => {
+    window.checkoutState.selectedAddressId = id;
+    renderCheckoutAddresses();
+};
+
+window.continueToSummary = () => {
+    const step1 = document.getElementById('checkout-step-address');
+    const step2 = document.getElementById('checkout-step-summary');
+
+    if (step1 && step2) {
+        step1.style.opacity = '0.5';
+        step1.style.pointerEvents = 'none';
+        step1.classList.remove('active');
+
+        step2.style.opacity = '1';
+        step2.style.pointerEvents = 'all';
+        step2.classList.add('active');
+
+        renderCheckoutSummaryItems();
+    }
+};
+
+window.backToAddress = () => {
+    const step1 = document.getElementById('checkout-step-address');
+    const step2 = document.getElementById('checkout-step-summary');
+
+    if (step1 && step2) {
+        step1.style.opacity = '1';
+        step1.style.pointerEvents = 'all';
+        step1.classList.add('active');
+
+        step2.style.opacity = '0.5';
+        step2.style.pointerEvents = 'none';
+        step2.classList.remove('active');
+    }
+};
+
+function renderCheckoutSummaryItems() {
+    const list = document.getElementById('checkout-items-summary');
+    const items = window.checkoutState.items;
+
+    if (list) {
+        list.innerHTML = items.map(item => {
+            // Mapping specifications for premium view
+            const edition = item.type === 'PHYSICAL' ? 'Hardcover Edition' : (item.type === 'EBOOK' ? 'Digital eBook' : 'Audiobook');
+            const subtotal = (parseFloat(item.price) * (parseInt(item.quantity) || 1)).toFixed(2);
+            const originalPrice = (parseFloat(item.price) * 2).toFixed(2); // Mocking original price
+
+            return `
+                <div class="premium-summary-card" style="margin-bottom: 25px;">
+                    <div class="premium-summary-image-col">
+                        <img src="${item.thumbnail || 'img/vol1-cover.png'}" onerror="this.src='img/vol1-cover.png'">
+                    </div>
+                    <div class="premium-summary-details">
+                        <div class="edition-text">${edition}</div>
+                        <h2>${item.name || item.title}</h2>
+                        <div style="display:flex; align-items:center; gap:10px; margin: 10px 0;">
+                            <span style="background:var(--gold-text); color:black; padding:2px 8px; border-radius:4px; font-weight:800; font-size:0.8rem;">4.8 ★</span>
+                            <span style="opacity:0.6; font-size:0.85rem;">2,450 Reviews</span>
+                        </div>
+                        <div class="price-row">
+                            ₹${item.price} <span>₹${originalPrice}</span>
+                        </div>
+
+                        <div style="background: rgba(255,255,255,0.03); border-radius:12px; padding:15px; border:1px solid rgba(255,255,255,0.05); margin-bottom:20px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <span style="color:var(--gold-text); font-weight:700;">Select Quantity:</span>
+                                <div style="display:flex; align-items:center; gap:15px; background:rgba(0,0,0,0.3); padding:5px 15px; border-radius:20px; border:1px solid rgba(255,255,255,0.1);">
+                                    <span style="font-weight:800;">${item.quantity}</span>
+                                </div>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:0.9rem;">
+                                <span style="opacity:0.6;">Subtotal:</span>
+                                <span style="font-weight:700;">₹${subtotal}</span>
+                            </div>
+                        </div>
+
+                        <div class="premium-summary-spec-grid">
+                            <div class="premium-summary-spec-item">Product Form <strong>${item.type || 'Physical'}</strong></div>
+                            <div class="premium-summary-spec-item">Language <strong>${item.language || 'Hindi'}</strong></div>
+                            <div class="premium-summary-spec-item">ISBN-13 <strong>9789173254121</strong></div>
+                            <div class="premium-summary-spec-item">Dimensions <strong>6.0 x 9.0 inches</strong></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    const addr = window.currentUserProfile.savedAddresses.find(a => (a._id || a.id) === window.checkoutState.selectedAddressId);
+    if (addr && document.getElementById('selected-address-preview')) {
+        document.getElementById('selected-address-preview').innerHTML = `
+                <strong>${addr.fullName}</strong> | ${addr.phone}<br>
+                ${addr.house}, ${addr.area}, ${addr.city}, ${addr.state} - ${addr.pincode}
+            `;
+    }
+}
+
+window.proceedToPayment = async function () {
+    const items = window.checkoutState.items;
+    const addressId = window.checkoutState.selectedAddressId;
+    const user = window.currentUserProfile;
+
+    if (!addressId) {
+        showToast("Please select a delivery address", "error");
+        return;
+    }
+
+    const subtotal = items.reduce((sum, i) => sum + (parseFloat(i.price) * (parseInt(i.quantity) || 1)), 0);
+    const tax = subtotal * 0.18;
+    const totalAmount = subtotal + tax;
 
     try {
-        // Create Order
+        const token = localStorage.getItem('authToken');
+        // Create Order on Backend
         const rzpRes = await fetch(`${API_BASE}/api/orders/razorpay`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ amount: totalAmount })
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                amount: totalAmount,
+                items: items,
+                addressId: addressId
+            })
         });
         const rzpOrderData = await rzpRes.json();
-
         if (!rzpRes.ok) throw new Error(rzpOrderData.message || 'Payment init failed');
 
         const options = {
-            key: 'rzp_live_SBFlInxBiRfOGd',
+            key: 'rzp_live_SBFlInxBiRfOGd', // Replace with your key
             amount: rzpOrderData.amount,
             currency: rzpOrderData.currency,
-            name: 'EFV Dashboard Checkout',
-            description: 'Order from Dashboard',
+            name: 'EFV™ Secure Payment',
+            description: `Order #${rzpOrderData.id}`,
             order_id: rzpOrderData.id,
             prefill: { name: user.name, email: user.email },
-            theme: { color: '#FFD369' },
+            theme: { color: '#D4AF37' },
             handler: async function (response) {
-                // Verification (Simulated for UI flow speed, or call backend)
-                // Assuming success for UX demo flow
-
-                // 1. Move to Orders
-                const historyKey = getUserKey('efv_purchase_history');
-                let history = JSON.parse(localStorage.getItem(historyKey)) || [];
-
-                items.forEach(item => {
-                    // Check if exists? Orders are usually unique transactions, but we stack qty
-                    history.push({
-                        name: item.name,
-                        price: item.price,
-                        quantity: item.quantity,
-                        date: new Date().toLocaleDateString()
-                    });
+                // Verify Payment on Backend
+                const verifyRes = await fetch(`${API_BASE}/api/orders/verify`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        razorpay_order_id: response.razorpay_order_id,
+                        razorpay_payment_id: response.razorpay_payment_id,
+                        razorpay_signature: response.razorpay_signature,
+                        checkoutData: window.checkoutState
+                    })
                 });
-                localStorage.setItem(historyKey, JSON.stringify(history));
 
-                // 2. Add to Library if Digital
-                const libKey = getUserKey('efv_digital_library');
-                let library = JSON.parse(localStorage.getItem(libKey)) || [];
-
-                items.forEach(item => {
-                    const isAudio = item.name.toLowerCase().includes('audiobook');
-                    const isEbook = item.name.toLowerCase().includes('e-book') || item.name.toLowerCase().includes('ebook');
-
-                    if (isAudio || isEbook) {
-                        // Check duplicates
-                        const key = `${item.name}_${item.language || ''}`.toLowerCase();
-                        if (!library.some(l => `${l.name}_${l.language || ''}`.toLowerCase() === key)) {
-                            library.push({
-                                id: item.id || Date.now(), // Fallback ID
-                                name: item.name,
-                                language: item.language || '',
-                                subtitle: item.subtitle || '',
-                                type: isAudio ? 'Audiobook' : 'E-Book',
-                                date: new Date().toLocaleDateString()
-                            });
-                        }
+                if (verifyRes.ok) {
+                    // Success logic
+                    if (window.checkoutState.isSingleItemMode && window.checkoutState.cartIdToRemove) {
+                        removeFromCart(window.checkoutState.cartIdToRemove);
+                    } else if (!window.checkoutState.isSingleItemMode) {
+                        localStorage.removeItem(getUserKey('efv_cart'));
                     }
-                });
-                localStorage.setItem(libKey, JSON.stringify(library));
 
-                // 3. Remove from Cart
-                if (isSingleItemMode && cartIndexToRemove !== undefined) {
-                    removeFromCart(cartIndexToRemove);
+                    showToast('Order Placed Successfully!', 'success');
+                    closeCheckout();
+                    fetchProfileData();
+                    switchTab('orders');
+                } else {
+                    alert('Payment verification failed. Please contact support.');
                 }
-
-                // 4. Update UI
-                alert('Payment Successful! Item moved to Orders/Library.');
-                renderCartTab();
-                renderOrdersTab();
-                renderLibraryTab();
-                updateStats();
-
-                // Switch to Orders Tab
-                document.querySelector('.nav-item[data-tab="orders"]').click();
             }
         };
 
@@ -1078,9 +1322,9 @@ async function initiateDashboardCheckout(items, isSingleItemMode, cartIndexToRem
         rzp.open();
 
     } catch (e) {
-        alert('Payment Initialization Failed: ' + e.message);
+        showToast('Checkout Failed: ' + e.message, 'error');
     }
-}
+};
 
 window.accessContent = function (type, name, id) {
     console.log(`📂 Accessing Content | Requested Type: ${type} | Name: ${name} | ID: ${id}`);
@@ -2206,51 +2450,95 @@ window.viewOrderDetail = async function (id) {
         if (!res.ok) throw new Error(order.message);
 
         document.getElementById('modal-order-id').textContent = `#${order.orderId}`;
-        document.getElementById('modal-order-date').textContent = `Placed on: ${new Date(order.createdAt).toLocaleDateString()}`;
-        document.getElementById('modal-subtotal').textContent = `₹${order.totalAmount}`; // Simple for now
-        document.getElementById('modal-total').textContent = `₹${order.totalAmount}`;
-        document.getElementById('modal-payment-method').textContent = order.paymentMethod;
-        document.getElementById('modal-payment-status').textContent = order.paymentStatus;
+        const dateEl = document.getElementById('modal-order-date');
+        if (dateEl) dateEl.textContent = `Placed on: ${new Date(order.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}`;
+
+        const subtotalEl = document.getElementById('modal-subtotal');
+        const totalEl = document.getElementById('modal-total');
+        if (subtotalEl) subtotalEl.textContent = `₹${order.totalAmount}`;
+        if (totalEl) totalEl.textContent = `₹${order.totalAmount}`;
+
+        const methodEl = document.getElementById('modal-payment-method');
+        const statusPayEl = document.getElementById('modal-payment-status');
+        if (methodEl) methodEl.textContent = order.paymentMethod || 'Razorpay';
+        if (statusPayEl) {
+            statusPayEl.textContent = order.paymentStatus || 'Paid';
+            statusPayEl.style.color = (order.paymentStatus === 'Paid') ? '#4CAF50' : '#ff4d4d';
+        }
 
         // Items
         const itemsContainer = document.getElementById('modal-order-items');
         itemsContainer.innerHTML = order.items.map(item => `
-            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.03); padding:10px; border-radius:8px;">
-                <div>
-                    <h4 style="margin:0; font-size:0.95rem;">${item.title}</h4>
-                    <p style="margin:0; font-size:0.8rem; opacity:0.6;">${item.type} (x${item.quantity})</p>
+            <div style="display:flex; gap:15px; align-items:center; background:rgba(255,255,255,0.03); padding:15px; border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                <div style="flex:1;">
+                    <h4 style="margin:0; font-size:0.95rem; color:white;">${item.title}</h4>
+                    <p style="margin:5px 0 0; font-size:0.8rem; opacity:0.6;">${item.type} • Qty: ${item.quantity}</p>
                 </div>
-                <span class="gold-text" style="font-weight:bold;">₹${item.price}</span>
+                <div style="text-align:right;">
+                    <span class="gold-text" style="font-weight:700;">₹${item.price}</span>
+                </div>
             </div>
         `).join('');
 
         // Address
         const addr = order.customer;
-        document.getElementById('modal-shipping-address').innerHTML = `
-            ${addr.name}<br>
-            ${addr.address}<br>
-            Phone: ${addr.phone}
-        `;
-
-        // Timeline
-        const timeline = document.getElementById('modal-order-timeline');
-        const steps = ['Pending', 'Processing', 'Packed', 'Shipped', 'Out for Delivery', 'Delivered'];
-        const currentIdx = steps.indexOf(order.status);
-
-        timeline.innerHTML = steps.map((s, idx) => {
-            const isCompleted = idx < currentIdx;
-            const isActive = idx === currentIdx;
-            const hist = order.timeline.find(t => t.status === s);
-            return `
-                <div class="timeline-step ${isCompleted ? 'completed' : ''} ${isActive ? 'active' : ''}">
-                    <h5>${s}</h5>
-                    <p>${hist ? new Date(hist.timestamp).toLocaleString() : (isCompleted ? 'Completed' : 'Upcoming')}</p>
-                </div>
+        const addrContainer = document.getElementById('modal-shipping-address');
+        if (addrContainer) {
+            addrContainer.innerHTML = `
+                <strong style="color:white;">${addr.name}</strong><br>
+                ${addr.address}<br>
+                ${addr.city}, ${addr.zip}<br>
+                <span style="opacity:0.6;"><i class="fas fa-phone-alt" style="font-size:0.7rem;"></i> ${addr.phone}</span>
             `;
-        }).join('');
+        }
+
+        // Timeline V2
+        const timeline = document.getElementById('modal-order-timeline');
+        if (timeline) {
+            const steps = ['Processing', 'Packed', 'Shipped', 'Out for Delivery', 'Delivered'];
+            const icons = ['cog', 'box-open', 'shipping-fast', 'motorcycle', 'check-double'];
+
+            // Map status to these steps
+            let currentIdx = steps.indexOf(order.status);
+            if (currentIdx === -1 && order.status === 'Paid') currentIdx = 0; // Paid maps to Processing start
+
+            timeline.innerHTML = steps.map((s, idx) => {
+                const isCompleted = idx < currentIdx;
+                const isActive = idx === currentIdx;
+                const hist = order.timeline ? order.timeline.find(t => t.status === s) : null;
+                const timeStr = hist ? new Date(hist.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+                return `
+                    <div class="timeline-step-v2 ${isCompleted ? 'completed' : ''} ${isActive ? 'active' : ''}">
+                        <div class="step-icon-v2">
+                            <i class="fas fa-${icons[idx]}"></i>
+                        </div>
+                        <span class="step-label-v2">${s}</span>
+                        ${hist ? `<span class="step-time-v2">${timeStr}</span>` : ''}
+                    </div>
+                `;
+            }).join('');
+
+            // Add AWB display and Refresh button if AWB is present
+            const awb = order.awbNumber || order.awb || order.shipmentId; // Check all possible AWB fields
+            if (awb && awb.length > 5) {
+                timeline.insertAdjacentHTML('afterend', `
+                    <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <span style="font-size: 0.75rem; opacity: 0.5; display: block; margin-bottom: 5px;">AWB NUMBER</span>
+                            <span style="font-weight: 700; color: white; letter-spacing: 1px;">${awb}</span>
+                        </div>
+                        <button class="btn btn-outline small" onclick="refreshTrackingData('${awb}')" id="refresh-track-btn">
+                            <i class="fas fa-sync-alt"></i> Refresh Live Status
+                        </button>
+                    </div>
+                    <div id="live-tracking-updates" style="margin-top: 15px;"></div>
+                `);
+            }
+        }
 
         modal.style.display = 'flex';
-        modal.classList.add('active');
+        document.body.classList.add('modal-open');
     } catch (e) {
         console.error("Error loading order:", e);
         showToast("Error loading order details", "error");
@@ -2259,6 +2547,54 @@ window.viewOrderDetail = async function (id) {
 
 window.closeOrderDetailModal = () => {
     document.getElementById('order-detail-modal').style.display = 'none';
+    document.body.classList.remove('modal-open');
+};
+
+window.refreshTrackingData = async function (awb) {
+    const btn = document.getElementById('refresh-track-btn');
+    const logs = document.getElementById('live-tracking-updates');
+    if (!btn || !logs) return;
+
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Fetching...';
+    btn.disabled = true;
+
+    try {
+        const token = localStorage.getItem('authToken');
+        const res = await fetch(`${API_BASE}/api/shipments/track/${awb}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+
+        if (res.ok && data.status) {
+            // NimbusPost response usually has history in data.history or data.tracking_data
+            const tracking = data.data;
+            if (tracking && tracking.history) {
+                logs.innerHTML = `
+                    <div style="background: rgba(255,211,105,0.05); border-radius: 12px; padding: 15px; border: 1px border-dashed rgba(255,211,105,0.2);">
+                        <p style="margin: 0 0 10px; font-size: 0.8rem; font-weight: 800; color: var(--gold-text); text-transform: uppercase;">Latest Updates from NimbusPost</p>
+                        ${tracking.history.slice(0, 3).map(h => `
+                            <div style="font-size: 0.85rem; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                <span style="color: white; display: block; font-weight: 600;">${h.status || h.event_description}</span>
+                                <span style="opacity: 0.5; font-size: 0.75rem;">${h.location || 'In Transit'} • ${new Date(h.event_time || h.date).toLocaleString()}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                showToast("Live tracking updated", "success");
+            } else {
+                logs.innerHTML = `<p style="font-size: 0.8rem; opacity: 0.5; text-align: center;">Tracking info initiated. Waiting for carrier updates.</p>`;
+            }
+        } else {
+            showToast(data.message || "Tracking info not available yet", "info");
+        }
+    } catch (e) {
+        console.error(e);
+        showToast("Error connecting to shipping server", "error");
+    } finally {
+        btn.innerHTML = originalHTML;
+        btn.disabled = false;
+    }
 };
 
 // Address Management
@@ -2270,23 +2606,28 @@ window.openAddressModal = function (id = null) {
     if (!modal || !form) return;
 
     form.reset();
-    document.getElementById('address-id').value = id || '';
+    const addrIdEl = document.getElementById('address-id');
+    if (addrIdEl) addrIdEl.value = id || '';
 
-    if (id) {
-        title.textContent = 'Edit Address';
-        const addr = window.currentUserProfile.savedAddresses.find(a => a._id === id);
+    if (id && window.currentUserProfile && window.currentUserProfile.savedAddresses) {
+        title.textContent = 'EDIT ADDRESS';
+        const addr = window.currentUserProfile.savedAddresses.find(a => (a._id || a.id) === id);
         if (addr) {
             document.getElementById('addr-name').value = addr.fullName || '';
             document.getElementById('addr-phone').value = addr.phone || '';
             document.getElementById('addr-pincode').value = addr.pincode || '';
             document.getElementById('addr-state').value = addr.state || '';
             document.getElementById('addr-city').value = addr.city || '';
-            document.getElementById('addr-full').value = addr.fullAddress || '';
+            document.getElementById('addr-house').value = addr.house || '';
+            document.getElementById('addr-area').value = addr.area || '';
             document.getElementById('addr-landmark').value = addr.landmark || '';
             document.getElementById('addr-default').checked = !!addr.isDefault;
+
+            const typeRadio = document.querySelector(`input[name="addr-type"][value="${addr.type || 'Home'}"]`);
+            if (typeRadio) typeRadio.checked = true;
         }
     } else {
-        title.textContent = 'Add New Address';
+        title.textContent = 'ADD NEW ADDRESS';
     }
 
     modal.style.display = 'flex';
@@ -2312,16 +2653,18 @@ if (document.getElementById('address-form')) {
             pincode: document.getElementById('addr-pincode').value,
             state: document.getElementById('addr-state').value,
             city: document.getElementById('addr-city').value,
-            fullAddress: document.getElementById('addr-full').value,
+            house: document.getElementById('addr-house').value,
+            area: document.getElementById('addr-area').value,
             landmark: document.getElementById('addr-landmark').value,
+            type: document.querySelector('input[name="addr-type"]:checked').value,
             isDefault: document.getElementById('addr-default').checked,
-            label: 'Saved' // Or add another field
+            fullAddress: `${document.getElementById('addr-house').value}, ${document.getElementById('addr-area').value}`
         };
 
         const url = id ? `${API_BASE}/api/users/address/${id}` : `${API_BASE}/api/users/address`;
         const method = id ? 'PUT' : 'POST';
 
-        await fetch(url, {
+        const savedRes = await fetch(url, {
             method,
             headers: {
                 'Content-Type': 'application/json',
@@ -2330,8 +2673,24 @@ if (document.getElementById('address-form')) {
             body: JSON.stringify(data)
         });
 
+        const savedAddresses = await savedRes.json();
         closeAddressModal();
-        fetchProfileData();
+        await fetchProfileData();
+
+        // CHECKOUT FLOW INTEGRATION
+        const checkoutOverlay = document.getElementById('checkout-overlay');
+        if (checkoutOverlay && checkoutOverlay.style.display === 'flex') {
+            // If new address added, select it
+            if (!id && savedAddresses.length > 0) {
+                const newAddr = savedAddresses.find(a => a.fullName === data.fullName && a.phone === data.phone);
+                if (newAddr) window.checkoutState.selectedAddressId = newAddr._id || newAddr.id;
+            }
+            renderCheckoutAddresses();
+            // Automatically continue to summary if an address is now selected
+            if (window.checkoutState.selectedAddressId) {
+                continueToSummary();
+            }
+        }
     });
 }
 
@@ -2453,7 +2812,7 @@ window.loadRecentlyViewed = function () {
 function renderMiniProductCard(p) {
     return `
         <div class="mini-product-card glass-panel" onclick="location.href='marketplace.html?id=${p._id || p.id}'">
-            <img src="${p.thumbnail}" alt="${p.title}">
+            <img src="${p.thumbnail || 'img/vol1-cover.png'}" alt="${p.title}">
             <div class="mini-card-info">
                 <h4>${p.title}</h4>
                 <p class="gold-text">₹${p.price}</p>
@@ -2533,9 +2892,8 @@ window.renderCartTab = function () {
                 <!-- Subtle glow accent -->
                 <div style="position:absolute; top:0; left:0; right:0; height:1px; background: linear-gradient(90deg, transparent, rgba(255,211,105,0.3), transparent);"></div>
 
-                <!-- Book Cover -->
                 <div style="position: relative; flex-shrink: 0;">
-                    <img src="${item.thumbnail}" 
+                    <img src="${item.thumbnail || 'img/vol1-cover.png'}" 
                         style="width: 75px; height: 105px; object-fit: cover; border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); border: 1px solid rgba(255,211,105,0.2);"
                         onerror="this.src='img/vol1-cover.png'">
                     <div style="position:absolute; bottom:-5px; right:-5px; background: var(--gold-text); color: #000; font-size: 0.6rem; font-weight: 800; padding: 2px 6px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
@@ -2681,11 +3039,17 @@ window.removeFromWishlist = function (id) {
 
 function getStatusClass(status) {
     if (!status) return 'status-pending';
-    switch (status.toLowerCase()) {
-        case 'delivered': return 'status-delivered';
+    const s = status.toLowerCase().replace(/\s/g, '-');
+    switch (s) {
+        case 'delivered':
+        case 'completed': return 'status-delivered';
         case 'shipped': return 'status-shipped';
-        case 'processing': return 'status-processing';
-        case 'cancelled': return 'status-cancelled';
+        case 'processing':
+        case 'packed': return 'status-processing';
+        case 'cancelled':
+        case 'failed':
+        case 'payment-failed': return 'status-cancelled';
+        case 'paid': return 'status-shipped';
         default: return 'status-pending';
     }
 }
