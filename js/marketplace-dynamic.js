@@ -242,27 +242,24 @@ document.addEventListener('DOMContentLoaded', () => {
             const backendProducts = await response.json();
             if (!Array.isArray(backendProducts)) return;
 
-            // Create a combined list starting with our static products
-            let combinedProducts = [...STATIC_PRODUCTS];
-
-            // Update existing products and add NEW ones from backend
-            backendProducts.forEach(b => {
-                const staticIndex = combinedProducts.findIndex(sp => sp._id === b._id);
-                if (staticIndex !== -1) {
-                    // Update existing static product
+            // Use backend products as the source of truth for the catalog
+            // This ensures that products deleted in Admin disappear from Marketplace
+            const combinedProducts = backendProducts.map(b => {
+                const staticMatch = STATIC_PRODUCTS.find(sp => sp._id === b._id);
+                if (staticMatch) {
+                    // Update static entry with live backend data
                     const preserved = {
-                        language: combinedProducts[staticIndex].language,
-                        thumbnail: combinedProducts[staticIndex].thumbnail || b.thumbnail
+                        language: staticMatch.language,
+                        thumbnail: staticMatch.thumbnail || b.thumbnail
                     };
-                    combinedProducts[staticIndex] = { ...combinedProducts[staticIndex], ...b, ...preserved };
-                } else {
-                    // Add completely NEW product that isn't in static list
-                    combinedProducts.push(b);
+                    return { ...staticMatch, ...b, ...preserved };
                 }
+                // It's a brand new product not in our static list
+                return b;
             });
 
-            // Re-render EVERYTHING to ensure all updates and new arrivals are visible
-            console.log('🔄 Marketplace: Applying backend updates & new products...');
+            // Re-render EVERYTHING to ensure all updates, additions, AND deletions are reflected
+            console.log('🔄 Marketplace: Syncing with Admin inventory (Updates & Deletions)...');
             renderProducts(combinedProducts, true);
         } catch (err) {
             console.log('ℹ️ Marketplace: Offline mode or timeout — using static catalog');

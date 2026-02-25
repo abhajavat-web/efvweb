@@ -1948,8 +1948,14 @@ window.filterAdminOrders = function () {
                 </select>
             </td>
             <td style="padding: 12px;">
-                <button class="btn btn-outline small" onclick="viewAdminOrderDetail('${o._id}')">View</button>
-                <button class="btn-icon" style="color: #ff4d4d; margin-left:10px;" onclick="window.deleteOrder('${o._id}')"><i class="fas fa-trash"></i></button>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <button class="btn btn-outline small" onclick="viewAdminOrderDetail('${o._id}')">View</button>
+                    ${(o.paymentStatus === 'Paid' && !o.shipmentId && o.items.some(i => ['HARDCOVER', 'PAPERBACK'].includes(i.type))) ?
+                `<button class="btn btn-gold tiny" onclick="window.createNimbusShipment('${o._id}')" id="ship-btn-${o._id}" style="font-size: 0.65rem; padding: 4px 8px;"><i class="fas fa-truck"></i> Ship</button>` :
+                (o.shipmentId ? `<span style="color:#2ecc71; font-size:0.75rem;"><i class="fas fa-check"></i> Shipped</span>` : '')
+            }
+                    <button class="btn-icon" style="color: #ff4d4d;" onclick="window.deleteOrder('${o._id}')"><i class="fas fa-trash"></i></button>
+                </div>
             </td>
         `;
         tbody.appendChild(tr);
@@ -2229,6 +2235,45 @@ window.trackNimbusShipment = async function (awb) {
     } catch (e) {
         console.error(e);
         showToast("Tracking failed", "error");
+    }
+};
+
+window.createNimbusShipment = async function (orderId) {
+    const btn = document.getElementById(`ship-btn-${orderId}`);
+    if (!btn) return;
+
+    if (!confirm('Initiate shipping with NimbusPost? This will create a live shipment record.')) return;
+
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>';
+
+    try {
+        const token = localStorage.getItem('authToken');
+        const res = await fetch(`${API_BASE}/api/shipments/create`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ orderId })
+        });
+
+        const result = await res.json();
+        if (res.ok) {
+            showToast('✅ Shipment Created Successfully!', 'success');
+            if (typeof window.loadAdminOrdersFull === 'function') window.loadAdminOrdersFull();
+            if (typeof window.loadAdminShipments === 'function') window.loadAdminShipments();
+        } else {
+            alert(result.message || 'Shipment creation failed');
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    } catch (e) {
+        console.error(e);
+        alert('Error creating shipment: ' + e.message);
+        btn.disabled = false;
+        btn.innerHTML = originalText;
     }
 };
 
