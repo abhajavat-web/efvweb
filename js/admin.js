@@ -2300,7 +2300,7 @@ window.loadAdminCoupons = async function () {
                         <td style="padding: 12px;">${expiry}</td>
                         <td style="padding: 12px;"><span class="badge ${c.isActive ? 'green' : 'red'}">${c.isActive ? 'Active' : 'Disabled'}</span></td>
                         <td style="padding: 12px;">
-                            <button class="btn-icon" style="color: #ff4d4d;" onclick="deleteCoupon('${c._id}')"><i class="fas fa-trash"></i></button>
+                            <button class="btn-icon" style="color: #ff4d4d;" onclick="window.deleteCoupon('${c._id}')"><i class="fas fa-trash"></i></button>
                         </td>
                     `;
             tbody.appendChild(tr);
@@ -3021,7 +3021,10 @@ window.deleteCoupon = async function (id) {
         });
         if (res.ok) {
             showToast('Coupon deleted', 'info');
-            loadAdminCoupons();
+            if (typeof window.loadAdminCoupons === 'function') window.loadAdminCoupons();
+        } else {
+            const err = await res.json();
+            alert('Failed to delete coupon: ' + (err.message || 'Unknown error'));
         }
     } catch (e) { console.error(e); }
 };
